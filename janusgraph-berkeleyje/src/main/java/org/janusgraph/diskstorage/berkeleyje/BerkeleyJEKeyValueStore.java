@@ -51,6 +51,7 @@ public class BerkeleyJEKeyValueStore implements OrderedKeyValueStore {
         name = n;
         manager = m;
         isOpen = true;
+
     }
 
     public DatabaseConfig getConfiguration() throws BackendException {
@@ -99,9 +100,10 @@ public class BerkeleyJEKeyValueStore implements OrderedKeyValueStore {
             DatabaseEntry databaseKey = key.as(ENTRY_FACTORY);
             DatabaseEntry data = new DatabaseEntry();
 
-            log.trace("db={}, op=get, tx={}", name, txh);
+            //log.trace("db={}, op=get, tx={}, databaseKey={}", name, txh, databaseKey);
 
             OperationStatus status = db.get(tx, databaseKey, data, getLockMode(txh));
+            log.trace("db={}, op=get, tx={}, databaseKey={}, value={}", name, txh, databaseKey, data.getData());
 
             if (status == OperationStatus.SUCCESS) {
                 return getBuffer(data);
@@ -127,7 +129,7 @@ public class BerkeleyJEKeyValueStore implements OrderedKeyValueStore {
 
     @Override
     public RecordIterator<KeyValueEntry> getSlice(KVQuery query, StoreTransaction txh) throws BackendException {
-        log.trace("beginning db={}, op=getSlice, tx={}", name, txh);
+        //log.trace("beginning db={}, op=getSlice, tx={}", name, txh);
         final StaticBuffer keyStart = query.getStart();
         final StaticBuffer keyEnd = query.getEnd();
         final KeySelector selector = query.getKeySelector();
@@ -139,6 +141,7 @@ public class BerkeleyJEKeyValueStore implements OrderedKeyValueStore {
         try {
             OperationStatus status = cursor.getSearchKeyRange(foundKey, foundData, getLockMode(txh));
             //Iterate until given condition is satisfied or end of records
+            log.trace("beginning db={}, op=getSlice, tx={} databaseKey={}, value={} ", name, txh, foundKey, foundData.getData());
             while (status == OperationStatus.SUCCESS) {
                 StaticBuffer key = getBuffer(foundKey);
 

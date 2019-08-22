@@ -244,6 +244,7 @@ public class EdgeSerializer implements RelationReader {
 
         DataOutput out = serializer.getDataOutput(DEFAULT_CAPACITY);
         int valuePosition;
+        logger.trace("EdgeSerializer typeId {} dirId {} isInvisibleType {}", typeId, dirID, type.isInvisibleType());
         IDHandler.writeRelationType(out, typeId, dirID, type.isInvisibleType());
         Multiplicity multiplicity = type.multiplicity();
 
@@ -260,6 +261,7 @@ public class EdgeSerializer implements RelationReader {
         //How multiplicity is handled for edges and properties is slightly different
         if (relation.isEdge()) {
             long otherVertexId = relation.getVertex((position + 1) % 2).longId();
+            logger.trace("EdgeSerializer edge: otherVertexId {} relationId {}",otherVertexId,relationId);
             if (multiplicity.isConstrained()) {
                 if (multiplicity.isUnique(dir)) {
                     valuePosition = out.getPosition();
@@ -281,7 +283,7 @@ public class EdgeSerializer implements RelationReader {
             Preconditions.checkNotNull(value);
             PropertyKey key = (PropertyKey) type;
             assert key.dataType().isInstance(value);
-
+            logger.trace("EdgeSerializer property otherVertexId {} relationId {}",key.label(),value);
             if (multiplicity.isConstrained()) {
                 if (multiplicity.isUnique(dir)) { //Cardinality=SINGLE
                     valuePosition = out.getPosition();
@@ -321,6 +323,7 @@ public class EdgeSerializer implements RelationReader {
         for (long tid : remaining) {
             PropertyKey t = tx.getExistingPropertyKey(tid);
             writeInline(out, t, relation.getValueDirect(t), InlineType.NORMAL);
+            logger.trace("EdgeSerializer value: writeInline label {} value {}",t.label(),relation.getValueDirect(t));
         }
         assert valuePosition>0;
 
@@ -347,6 +350,7 @@ public class EdgeSerializer implements RelationReader {
                                   InlineType inlineType) {
         for (long keyId : keyIds) {
             PropertyKey t = tx.getExistingPropertyKey(keyId);
+            logger.trace("EdgeSerializer: writeInlineTypes PropertyKey {}  value {} inline type {}", t.label(), relation.getValueDirect(t), inlineType);
             writeInline(out, t, relation.getValueDirect(t), inlineType);
         }
     }

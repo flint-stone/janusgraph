@@ -81,7 +81,8 @@ public class BerkeleyJEStoreManager extends LocalStoreManager implements Ordered
 
         features = new StandardStoreFeatures.Builder()
                     .orderedScan(true)
-                    .transactional(transactional)
+                    //.transactional(transactional)
+                    .transactional(false)
                     .keyConsistent(GraphDatabaseConfiguration.buildGraphConfiguration())
                     .locking(true)
                     .keyOrdered(true)
@@ -152,7 +153,8 @@ public class BerkeleyJEStoreManager extends LocalStoreManager implements Ordered
             BerkeleyJETx btx = new BerkeleyJETx(tx, ConfigOption.getEnumValue(effectiveCfg.get(LOCK_MODE),LockMode.class), txCfg);
 
             if (log.isTraceEnabled()) {
-                log.trace("Berkeley tx created", new TransactionBegin(btx.toString()));
+                log.trace("Berkeley tx created {}", btx.toString());
+                    //, new TransactionBegin(btx.toString()));
             }
 
             return btx;
@@ -181,7 +183,12 @@ public class BerkeleyJEStoreManager extends LocalStoreManager implements Ordered
 
             Database db = environment.openDatabase(null, name, dbConfig);
 
-            log.debug("Opened database {}", name, new Throwable());
+            log.debug("Opened database {} config {} environment{} dbConfig {}",
+                name,
+                db.getConfig(),
+                db.getEnvironment() + db.getDatabaseName(),
+                dbConfig,
+                new Throwable());
 
             BerkeleyJEKeyValueStore store = new BerkeleyJEKeyValueStore(name, db, this);
             stores.put(name, store);

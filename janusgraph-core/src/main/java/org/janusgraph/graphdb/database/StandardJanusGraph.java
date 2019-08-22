@@ -559,6 +559,7 @@ public class StandardJanusGraph extends JanusGraphBlueprintsGraph {
                 if (pos == 0 || !add.isLoop()) {
                     if (add.isProperty()) mutatedProperties.put(vertex,add);
                     mutations.put(vertex.longId(), add);
+                    log.trace("id: {} type: {} 0: {} arity {} {}", vertex.longId(), add.getType(), add.getVertex(0), add.getArity(), add.getPropertyKeysDirect().iterator().getClass());
                 }
                 if (!vertex.isNew() && acquireLock(add,pos,acquireLocks)) {
                     Entry entry = edgeSerializer.writeRelation(add, pos, tx);
