@@ -76,6 +76,7 @@ public class ReadArrayBuffer extends StaticArrayBuffer implements ReadBuffer {
 
     @Override
     public byte getByte() {
+
         return getByte(updatePos(1));
     }
 

@@ -20,9 +20,12 @@ import org.janusgraph.diskstorage.WriteBuffer;
 import org.janusgraph.diskstorage.util.BufferUtil;
 import org.janusgraph.diskstorage.util.StaticArrayBuffer;
 import org.janusgraph.diskstorage.util.WriteByteBuffer;
+import org.janusgraph.graphdb.database.EdgeSerializer;
 import org.janusgraph.graphdb.idmanagement.IDManager;
 import org.janusgraph.graphdb.internal.RelationCategory;
 import org.apache.tinkerpop.gremlin.structure.Direction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.janusgraph.graphdb.idmanagement.IDManager.VertexIDType.*;
 
@@ -32,6 +35,7 @@ import static org.janusgraph.graphdb.idmanagement.IDManager.VertexIDType.*;
 
 public class IDHandler {
 
+    private static final Logger logger = LoggerFactory.getLogger(IDHandler.class);
     public static final StaticBuffer MIN_KEY = BufferUtil.getLongBuffer(0);
     public static final StaticBuffer MAX_KEY = BufferUtil.getLongBuffer(-1);
 
@@ -131,12 +135,14 @@ public class IDHandler {
         long[] countPrefix = VariableLong.readPositiveWithPrefix(in, PREFIX_BIT_LEN);
         DirectionID dirID = DirectionID.getDirectionID((int) countPrefix[1] & 1, (int) (countPrefix[0] & 1));
         long typeId = countPrefix[0] >>> 1;
+        logger.trace("2-1. EdgeSerializer parseRelation: countPrefix[0] {}, typeId {}", countPrefix[0], typeId);
         boolean isSystemType = (countPrefix[1]>>1)==0;
 
         if (dirID == DirectionID.PROPERTY_DIR)
             typeId = IDManager.getSchemaId(isSystemType?SystemPropertyKey:UserPropertyKey, typeId);
         else
             typeId = IDManager.getSchemaId(isSystemType?SystemEdgeLabel:UserEdgeLabel, typeId);
+        logger.trace("2-2. EdgeSerializer parseRelation: dirID {}, typeId {}", dirID, typeId);
         return new RelationTypeParse(typeId,dirID);
     }
 

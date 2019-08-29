@@ -85,6 +85,13 @@ public class EdgeSerializer implements RelationReader {
     @Override
     public RelationCache parseRelation(Entry data, boolean excludeProperties, TypeInspector tx) {
         ReadBuffer in = data.asReadBuffer();
+        byte[] bytes = in.as(StaticBuffer.ARRAY_FACTORY);
+        logger.trace("EdgeSerializer Entry value position: {} buffer size {}, bytes key {} value {}",
+            data.getValuePosition(),
+            in.length(),
+            Arrays.copyOfRange(bytes, 0, data.getValuePosition()),
+            Arrays.copyOfRange(bytes, data.getValuePosition()+1, data.length()));
+        logger.trace("1. EdgeSerializer parseRelation: read buffer position{}", in.getPosition());
 
         LongObjectHashMap properties = excludeProperties ? null : new LongObjectHashMap(4);
         RelationTypeParse typeAndDir = IDHandler.readRelationType(in);
@@ -95,6 +102,10 @@ public class EdgeSerializer implements RelationReader {
         RelationType relationType = tx.getExistingRelationType(typeId);
         InternalRelationType def = (InternalRelationType) relationType;
         Multiplicity multiplicity = def.multiplicity();
+
+        logger.trace("2-3. EdgeSerializer parseRelation: read buffer position {} property size {} type id {} relation type {} InternalRelationType {}, multiplicity name {}"
+            , in.getPosition(), properties==null?"null":properties.size(), typeId, relationType.name(), def.name(), multiplicity.name());
+
         long[] keySignature = def.getSortKey();
 
         long relationId;
@@ -106,19 +117,27 @@ public class EdgeSerializer implements RelationReader {
             if (multiplicity.isConstrained()) {
                 if (multiplicity.isUnique(dir)) {
                     otherVertexId = VariableLong.readPositive(in);
+                    logger.trace("3-1. EdgeSerializer parseRelation: read buffer position{} other vertex id {}", in.getPosition(), otherVertexId);
                 } else {
                     in.movePositionTo(data.getValuePosition());
+                    logger.trace("3-2-1. EdgeSerializer parseRelation: read buffer position{}", in.getPosition());
                     otherVertexId = VariableLong.readPositiveBackward(in);
+                    logger.trace("3-2-2. EdgeSerializer parseRelation: read buffer position{} other vertex id {}", in.getPosition(), otherVertexId);
                     in.movePositionTo(data.getValuePosition());
+                    logger.trace("3-2-3. EdgeSerializer parseRelation: read buffer position{}", in.getPosition());
                 }
                 relationId = VariableLong.readPositive(in);
+                logger.trace("3-3. EdgeSerializer parseRelation: read buffer position{} relationId {}", in.getPosition(), relationId);
             } else {
                 in.movePositionTo(data.getValuePosition());
-
+                logger.trace("4-1. EdgeSerializer parseRelation: read buffer position{}", in.getPosition());
                 relationId = VariableLong.readPositiveBackward(in);
+                logger.trace("4-2. EdgeSerializer parseRelation: read buffer position{} relationId {}", in.getPosition(), relationId);
                 otherVertexId = VariableLong.readPositiveBackward(in);
+                logger.trace("4-3. EdgeSerializer parseRelation: read buffer position{}, other vertexId {}", in.getPosition(), otherVertexId);
                 endKeyPos = in.getPosition();
                 in.movePositionTo(data.getValuePosition());
+                logger.trace("4-4. EdgeSerializer parseRelation: read buffer position{}, endkeypos {} getValuePostion {}", in.getPosition(), endKeyPos, data.getValuePosition());
             }
             other = otherVertexId;
         } else {
@@ -127,13 +146,19 @@ public class EdgeSerializer implements RelationReader {
 
             if (multiplicity.isConstrained()) {
                 other = readPropertyValue(in,key);
+                logger.trace("5-1. EdgeSerializer parseRelation: read buffer position{} other {}", in.getPosition(), other);
                 relationId = VariableLong.readPositive(in);
+                logger.trace("5-2. EdgeSerializer parseRelation: read buffer position{} relationId {}", in.getPosition(), relationId);
             } else {
                 in.movePositionTo(data.getValuePosition());
+                logger.trace("6-1. EdgeSerializer parseRelation: read buffer position{}", in.getPosition());
                 relationId = VariableLong.readPositiveBackward(in);
+                logger.trace("6-2. EdgeSerializer parseRelation: read buffer position{} relationId {}", in.getPosition(), relationId);
                 endKeyPos = in.getPosition();
                 in.movePositionTo(data.getValuePosition());
+                logger.trace("6-3. EdgeSerializer parseRelation: read buffer position{} endKeyPos {}", in.getPosition(), endKeyPos);
                 other = readPropertyValue(in,key);
+                logger.trace("6-4. EdgeSerializer parseRelation: read buffer position{} other {}", in.getPosition(), other);
             }
             Preconditions.checkNotNull(other,
                 "Encountered error in deserializer [null value returned]. Check serializer compatibility.");
@@ -146,22 +171,29 @@ public class EdgeSerializer implements RelationReader {
             assert endKeyPos>startKeyPos;
             int keyLength = endKeyPos-startKeyPos; //after reading the ids, we are on the last byte of the key
             in.movePositionTo(startKeyPos);
+            logger.trace("7-1. EdgeSerializer parseRelation: read buffer position{} keyLength {}", in.getPosition(), keyLength);
             ReadBuffer inKey = in;
-            if (def.getSortOrder()== Order.DESC) inKey = in.subrange(keyLength,true);
+            if (def.getSortOrder()== Order.DESC) {
+                inKey = in.subrange(keyLength,true);
+                logger.trace("7-2. EdgeSerializer parseRelation: read buffer position{}", in.getPosition());
+            }
             readInlineTypes(keySignature, properties, inKey, tx, InlineType.KEY);
+            logger.trace("7-3. EdgeSerializer parseRelation: read buffer position{} signatures {}", in.getPosition(), Arrays.toString(keySignature));
             in.movePositionTo(currentPos);
+            logger.trace("7-4. EdgeSerializer parseRelation: read buffer position{}", in.getPosition());
         }
 
         if (!excludeProperties) {
             //read value signature
             readInlineTypes(def.getSignature(), properties, in, tx, InlineType.SIGNATURE);
-
+            logger.trace("8-1. EdgeSerializer parseRelation: read buffer position{} signatures {}", in.getPosition(), Arrays.toString(def.getSignature()));
             //Third: read rest
             while (in.hasRemaining()) {
                 PropertyKey type = tx.getExistingPropertyKey(IDHandler.readInlineRelationType(in));
                 Object propertyValue = readInline(in, type, InlineType.NORMAL);
                 assert propertyValue != null;
                 properties.put(type.longId(), propertyValue);
+                logger.trace("8-2. EdgeSerializer parseRelation: read buffer position{}", in.getPosition());
             }
 
             if (data.hasMetaData()) {
@@ -244,7 +276,8 @@ public class EdgeSerializer implements RelationReader {
 
         DataOutput out = serializer.getDataOutput(DEFAULT_CAPACITY);
         int valuePosition;
-        logger.trace("EdgeSerializer typeId {} dirId {} isInvisibleType {}", typeId, dirID, type.isInvisibleType());
+        logger.trace("EdgeSerializer typelabel {} typeId {} typename {} dirId {} isInvisibleType {}",
+            type.label(), typeId, type.name(), dirID.getDirection(), type.isInvisibleType());
         IDHandler.writeRelationType(out, typeId, dirID, type.isInvisibleType());
         Multiplicity multiplicity = type.multiplicity();
 
@@ -283,7 +316,7 @@ public class EdgeSerializer implements RelationReader {
             Preconditions.checkNotNull(value);
             PropertyKey key = (PropertyKey) type;
             assert key.dataType().isInstance(value);
-            logger.trace("EdgeSerializer property otherVertexId {} relationId {}",key.label(),value);
+            logger.trace("EdgeSerializer property: otherVertexId label {} name {} relationId {}",key.label(), key.name(),value);
             if (multiplicity.isConstrained()) {
                 if (multiplicity.isUnique(dir)) { //Cardinality=SINGLE
                     valuePosition = out.getPosition();
@@ -323,7 +356,8 @@ public class EdgeSerializer implements RelationReader {
         for (long tid : remaining) {
             PropertyKey t = tx.getExistingPropertyKey(tid);
             writeInline(out, t, relation.getValueDirect(t), InlineType.NORMAL);
-            logger.trace("EdgeSerializer value: writeInline label {} value {}",t.label(),relation.getValueDirect(t));
+            logger.trace("EdgeSerializer value: writeInline name {} label {} value {}",
+                t.name(),  t.label(), relation.getValueDirect(t));
         }
         assert valuePosition>0;
 

@@ -55,6 +55,10 @@ public class PlayGroundGraphQuery {
         load(graph, INDEX_NAME, false);
     }
 
+    public static void loadWithoutMixedIndex(final JanusGraph graph, boolean uniqueNameCompositeIndex) {
+        load(graph, null, uniqueNameCompositeIndex);
+    }
+
     public static void load(final JanusGraph graph, String mixedIndexName, boolean uniqueNameCompositeIndex) {
         if (graph instanceof StandardJanusGraph) {
             Preconditions.checkState(mixedIndexNullOrExists((StandardJanusGraph)graph, mixedIndexName),
