@@ -20,12 +20,17 @@ import org.janusgraph.diskstorage.ScanBuffer;
 import org.janusgraph.diskstorage.StaticBuffer;
 import org.janusgraph.diskstorage.WriteBuffer;
 import org.janusgraph.diskstorage.util.WriteByteBuffer;
+import org.janusgraph.graphdb.database.EdgeSerializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * @author Matthias Broecheler (me@matthiasb.com)
  */
 
 public class VariableLong {
+
+    private static final Logger logger = LoggerFactory.getLogger(EdgeSerializer.class);
 
     public static int unsignedByte(byte b) {
         return b < 0 ? b + 256 : b;
@@ -194,15 +199,23 @@ public class VariableLong {
         assert prefixBitLen > 0 && prefixBitLen < 6;
 
         int first = unsignedByte(in.getByte());
+        logger.trace("EdgeSerializer First int: {}", first);
+        logger.trace("EdgeSerializer current position: {}", in.getPosition());
         int deltaLen = 8 - prefixBitLen;
         long prefix = first >> deltaLen;
+        logger.trace("EdgeSerializer prefix: {} delta_len {}", first, deltaLen);
         long value =  first & ((1 << (deltaLen - 1)) - 1);
+        logger.trace("EdgeSerializer value {}", value);
         if ( ((first >>> (deltaLen-1)) & 1) == 1) { //Continue mask
+            logger.trace("EdgeSerializer current position: {}", in.getPosition());
             int deltaPos = in.getPosition();
             long remainder = readUnsigned(in);
+            logger.trace("EdgeSerializer remainder: {}", remainder);
             deltaPos = in.getPosition()-deltaPos;
+            logger.trace("EdgeSerializer deltaPos: {}", deltaPos);
             assert deltaPos > 0;
             value = (value << (deltaPos * 7)) + remainder;
+            logger.trace("EdgeSerializer value: {}", value);
         }
         return new long[]{value, prefix};
     }

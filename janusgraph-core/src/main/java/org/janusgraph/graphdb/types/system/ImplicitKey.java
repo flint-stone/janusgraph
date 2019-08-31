@@ -69,7 +69,7 @@ public class ImplicitKey extends EmptyRelationType implements SystemRelationType
         Preconditions.checkArgument(StringUtils.isNotBlank(name) && datatype!=null && id>0);
         assert Token.isSystemName(name);
         this.datatype=datatype;
-        this.name=name;
+        this.name=name + "$DT$"+datatype.getCanonicalName();
         this.id= BaseRelationType.getSystemTypeId(id, JanusGraphSchemaCategory.PROPERTYKEY);
     }
 

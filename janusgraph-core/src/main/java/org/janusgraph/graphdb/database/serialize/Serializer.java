@@ -30,4 +30,9 @@ public interface Serializer extends AttributeHandler, Closeable {
 
     DataOutput getDataOutput(int initialCapacity);
 
+    boolean supportsNullSerialization(Class type);
+
+    int getDataTypeRegistration(Class datatype);
+
+    Class getDataType(int registrationNo);
 }

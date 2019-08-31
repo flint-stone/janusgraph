@@ -32,6 +32,7 @@ import org.janusgraph.graphdb.database.idhandling.VariableLong;
 import org.janusgraph.graphdb.database.serialize.AttributeUtil;
 import org.janusgraph.graphdb.database.serialize.DataOutput;
 import org.janusgraph.graphdb.database.serialize.Serializer;
+import org.janusgraph.graphdb.database.serialize.StandardSerializer;
 import org.janusgraph.graphdb.internal.*;
 import org.janusgraph.graphdb.relations.EdgeDirection;
 import org.janusgraph.graphdb.relations.RelationCache;
@@ -91,7 +92,7 @@ public class EdgeSerializer implements RelationReader {
             in.length(),
             Arrays.copyOfRange(bytes, 0, data.getValuePosition()),
             Arrays.copyOfRange(bytes, data.getValuePosition()+1, data.length()));
-        logger.trace("1. EdgeSerializer parseRelation: read buffer position{}", in.getPosition());
+        logger.trace("1. EdgeSerializer parseRelation: read buffer position {}", in.getPosition());
 
         LongObjectHashMap properties = excludeProperties ? null : new LongObjectHashMap(4);
         RelationTypeParse typeAndDir = IDHandler.readRelationType(in);
@@ -105,6 +106,9 @@ public class EdgeSerializer implements RelationReader {
 
         logger.trace("2-3. EdgeSerializer parseRelation: read buffer position {} property size {} type id {} relation type {} InternalRelationType {}, multiplicity name {}"
             , in.getPosition(), properties==null?"null":properties.size(), typeId, relationType.name(), def.name(), multiplicity.name());
+        logger.trace("2-4. EdgeSerializer parseRelation: type id {} relationType.isEdgeLabel {} multiplicity.isConstrained {} multiplicity.isUnique(dir) {}"
+            , typeId, relationType.isEdgeLabel(), multiplicity.isConstrained(), multiplicity.isUnique(dir));
+
 
         long[] keySignature = def.getSortKey();
 
@@ -143,7 +147,7 @@ public class EdgeSerializer implements RelationReader {
         } else {
             assert relationType.isPropertyKey();
             PropertyKey key = (PropertyKey) relationType;
-
+            logger.trace("5-0. EdgeSerializer parseRelation: propertyKey {} key object {} hasGenericDataType {}", key, key.toString(), AttributeUtil.hasGenericDataType(key));
             if (multiplicity.isConstrained()) {
                 other = readPropertyValue(in,key);
                 logger.trace("5-1. EdgeSerializer parseRelation: read buffer position{} other {}", in.getPosition(), other);
@@ -281,6 +285,14 @@ public class EdgeSerializer implements RelationReader {
         IDHandler.writeRelationType(out, typeId, dirID, type.isInvisibleType());
         Multiplicity multiplicity = type.multiplicity();
 
+//        RelationType relationType = tx.getExistingRelationType(typeId);
+//        InternalRelationType def = (InternalRelationType) relationType;
+//        Multiplicity multiplicity = def.multiplicity();
+
+
+        logger.trace("Write EdgeSerializer writeRelation: type id {} relationType.isEdgeLabel {} multiplicity.isConstrained {} multiplicity.isUnique(dir) {}",
+            typeId, type.isEdgeLabel(), multiplicity.isConstrained(), multiplicity.isUnique(dir));
+
         long[] sortKey = type.getSortKey();
         assert !multiplicity.isConstrained() || sortKey.length==0: type.name();
         int keyStartPos = out.getPosition();
@@ -315,6 +327,20 @@ public class EdgeSerializer implements RelationReader {
             Object value = ((JanusGraphVertexProperty) relation).value();
             Preconditions.checkNotNull(value);
             PropertyKey key = (PropertyKey) type;
+
+            logger.trace("Write EdgeSerializer parseRelation: type id {} " +
+                    "PropertyKey.hasGenericDataType {} " +
+                    "supportsNullSerialization {} " +
+                    "DataTypeRegistrationNo {} " +
+                    "Datatype {} " +
+                    "byteOrder {}",
+                typeId,
+                AttributeUtil.hasGenericDataType(key),
+                serializer.supportsNullSerialization(key.dataType()),
+                serializer.getDataTypeRegistration(key.dataType()),
+                serializer.getDataType(serializer.getDataTypeRegistration(key.dataType())),
+                InlineType.NORMAL.writeByteOrdered()
+                );
             assert key.dataType().isInstance(value);
             logger.trace("EdgeSerializer property: otherVertexId label {} name {} relationId {}",key.label(), key.name(),value);
             if (multiplicity.isConstrained()) {

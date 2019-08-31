@@ -26,6 +26,7 @@ import org.janusgraph.diskstorage.WriteBuffer;
 import org.janusgraph.diskstorage.idmanagement.ConflictAvoidanceMode;
 import org.janusgraph.diskstorage.util.WriteByteBuffer;
 import org.janusgraph.diskstorage.util.time.TimestampProviders;
+import org.janusgraph.graphdb.database.EdgeSerializer;
 import org.janusgraph.graphdb.database.idhandling.VariableLong;
 import org.janusgraph.graphdb.database.log.LogTxStatus;
 import org.janusgraph.graphdb.database.management.GraphCacheEvictionAction;
@@ -44,6 +45,8 @@ import org.apache.tinkerpop.gremlin.process.traversal.traverser.util.TraverserSe
 import org.apache.tinkerpop.gremlin.structure.Direction;
 import org.apache.tinkerpop.shaded.jackson.databind.node.ArrayNode;
 import org.apache.tinkerpop.shaded.jackson.databind.node.ObjectNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -65,7 +68,7 @@ public class StandardSerializer implements AttributeHandler, Serializer {
      */
     private static final int CLASS_REGISTRATION_OFFSET = 100;
     private static final int MAX_REGISTRATION_NO = 100000;
-
+    private static final Logger logger = LoggerFactory.getLogger(StandardSerializer.class);
 
     private final BiMap<Integer,Class> registrations;
     private final Map<Class,AttributeSerializer> handlers;
@@ -184,14 +187,16 @@ public class StandardSerializer implements AttributeHandler, Serializer {
         return serializer;
     }
 
-    private int getDataTypeRegistration(Class datatype) {
+    @Override
+    public int getDataTypeRegistration(Class datatype) {
         Integer registrationNo = registrations.inverse().get(normalizeDataType(datatype));
         Preconditions.checkArgument(registrationNo!=null,"Datatype is not supported by database since no serializer has been registered: %s",datatype);
         assert registrationNo>0;
         return registrationNo;
     }
 
-    private Class getDataType(int registrationNo) {
+    @Override
+    public Class getDataType(int registrationNo) {
         Class clazz = registrations.get(registrationNo);
         Preconditions.checkArgument(clazz!=null,"Encountered missing datatype registration for number: %s",registrationNo);
         return clazz;
@@ -224,7 +229,8 @@ public class StandardSerializer implements AttributeHandler, Serializer {
         return (OrderPreservingSerializer)serializer;
     }
 
-    private boolean supportsNullSerialization(Class type) {
+    @Override
+    public boolean supportsNullSerialization(Class type) {
         return getSerializer(type) instanceof SupportsNullSerializer;
     }
 
@@ -244,7 +250,9 @@ public class StandardSerializer implements AttributeHandler, Serializer {
     }
 
     private <T> T readObjectInternal(ScanBuffer buffer, Class<T> type, boolean byteOrder) {
+
         if (supportsNullSerialization(type)) {
+            logger.trace("StandardSerializer readObjectInternal: supportsNullSerialization type {} byteOrder {} ", type.getName(), byteOrder);
             AttributeSerializer<T> s = getSerializer(type);
             if (byteOrder) return ensureOrderPreserving(s,type).readByteOrder(buffer);
             else return s.read(buffer);
@@ -255,6 +263,7 @@ public class StandardSerializer implements AttributeHandler, Serializer {
                 return null;
             } else {
                 Preconditions.checkArgument(flag==0,"Invalid flag encountered in serialization: %s. Corrupted data.",flag);
+                logger.trace("StandardSerializer readObjectInternal: readObjectNotNullInternal type {} byteOrder {}", type.getName(), byteOrder);
                 return readObjectNotNullInternal(buffer,type,byteOrder);
             }
         }
@@ -274,6 +283,7 @@ public class StandardSerializer implements AttributeHandler, Serializer {
         long registrationNo = VariableLong.readPositive(buffer);
         if (registrationNo==0) return null;
         Class datatype = getDataType((int)registrationNo);
+        logger.trace("StandardSerializer readClassAndObject: type {} registrationNo {} ", datatype.getName(), registrationNo);
         return readObjectNotNullInternal(buffer, datatype, false);
     }
 

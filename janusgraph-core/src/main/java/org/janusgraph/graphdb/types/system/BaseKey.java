@@ -183,7 +183,7 @@ public class BaseKey extends BaseRelationType implements PropertyKey {
 
         @Override
         public String getName() {
-            return "SystemIndex#"+BaseKey.this.name();
+            return "SystemIndex#"+BaseKey.this.name() + "DT"+dataType.getCanonicalName();
         }
 
         @Override
@@ -196,5 +196,10 @@ public class BaseKey extends BaseRelationType implements PropertyKey {
 
         //Use default hashcode and equals
     };
+
+    @Override
+    public String toString() {
+        return BaseKey.this.name() + "DT"+dataType.getCanonicalName();
+    }
 
 }

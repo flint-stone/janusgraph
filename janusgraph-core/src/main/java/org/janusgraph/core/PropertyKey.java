@@ -46,4 +46,7 @@ public interface PropertyKey extends RelationType {
      */
     Cardinality cardinality();
 
+    @Override
+    String toString();
+
 }
