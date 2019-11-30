@@ -29,10 +29,7 @@ import org.janusgraph.diskstorage.util.StaticArrayBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class BerkeleyJEKeyValueStore implements OrderedKeyValueStore {
 
@@ -132,6 +129,9 @@ public class BerkeleyJEKeyValueStore implements OrderedKeyValueStore {
         //log.trace("beginning db={}, op=getSlice, tx={}", name, txh);
         final StaticBuffer keyStart = query.getStart();
         final StaticBuffer keyEnd = query.getEnd();
+        log.trace("getSlice: beginning db={}, op=getSlice, tx={}, start = {} end = {}", name, txh,
+            Arrays.toString(keyStart.asByteBuffer().array()) ,
+            Arrays.toString(keyEnd.asByteBuffer().array()));
         final KeySelector selector = query.getKeySelector();
         final List<KeyValueEntry> result = new ArrayList<>();
         final DatabaseEntry foundKey = keyStart.as(ENTRY_FACTORY);
@@ -141,14 +141,15 @@ public class BerkeleyJEKeyValueStore implements OrderedKeyValueStore {
         try {
             OperationStatus status = cursor.getSearchKeyRange(foundKey, foundData, getLockMode(txh));
             //Iterate until given condition is satisfied or end of records
-            log.trace("beginning db={}, op=getSlice, tx={} databaseKey={}, value={} ", name, txh, foundKey, foundData.getData());
+            log.trace("getSlice: beginning db={}, op=getSlice, tx={} databaseKey={}, value={} ", name, txh, foundKey, foundData.getData());
             while (status == OperationStatus.SUCCESS) {
                 StaticBuffer key = getBuffer(foundKey);
-
+                log.trace("getSlice: op=getSlice, databaseKey={}, value={} ", Arrays.toString(foundKey.getData()), Arrays.toString(foundData.getData()));
                 if (key.compareTo(keyEnd) >= 0)
                     break;
 
                 if (selector.include(key)) {
+                    log.trace("getSlice included in result: op=getSlice, databaseKey={}, value={} ", Arrays.toString(foundKey.getData()), Arrays.toString(foundData.getData()));
                     result.add(new KeyValueEntry(key, getBuffer(foundData)));
                 }
 

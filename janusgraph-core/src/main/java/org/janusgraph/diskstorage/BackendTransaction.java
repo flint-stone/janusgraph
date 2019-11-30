@@ -15,6 +15,7 @@
 package org.janusgraph.diskstorage;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -363,6 +364,9 @@ public class BackendTransaction implements LoggableTransaction {
         return executeRead(new Callable<KeyIterator>() {
             @Override
             public KeyIterator call() throws Exception {
+                log.trace("{}: Get minimum key {} max key {}", new Throwable().getStackTrace()[0].getMethodName(),
+                    Arrays.toString(EDGESTORE_MIN_KEY.asByteBuffer().array()),
+                    Arrays.toString(EDGESTORE_MAX_KEY.asByteBuffer().array()));
                 return (storeFeatures.isKeyOrdered())
                         ? edgeStore.getKeys(new KeyRangeQuery(EDGESTORE_MIN_KEY, EDGESTORE_MAX_KEY, sliceQuery), storeTx)
                         : edgeStore.getKeys(sliceQuery, storeTx);

@@ -92,7 +92,9 @@ public class GraphDatabaseConfiguration {
             "Whether user provided vertex ids should be enabled and JanusGraph's automatic id allocation be disabled. " +
             "Useful when operating JanusGraph in concert with another storage system that assigns long ids but disables some " +
             "of JanusGraph's advanced features which can lead to inconsistent data. EXPERT FEATURE - USE WITH GREAT CARE.",
-            ConfigOption.Type.FIXED, false);
+            ConfigOption.Type.FIXED, true);
+            //ConfigOption.Type.FIXED, false);
+        //false);
 
     public static final ConfigOption<String> GRAPH_NAME = new ConfigOption<>(GRAPH_NS, "graphname",
             "This config option is an optional configuration setting that you may supply when opening a graph. " +

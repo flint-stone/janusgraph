@@ -18,13 +18,17 @@ import com.google.common.base.Preconditions;
 import org.janusgraph.core.Namifiable;
 import org.janusgraph.diskstorage.ScanBuffer;
 import org.janusgraph.diskstorage.WriteBuffer;
+import org.janusgraph.graphdb.database.EdgeSerializer;
 import org.janusgraph.graphdb.database.idhandling.VariableLong;
 import org.janusgraph.graphdb.database.serialize.OrderPreservingSerializer;
 import org.janusgraph.graphdb.database.serialize.SupportsNullSerializer;
 import org.janusgraph.util.encoding.StringEncoding;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -50,6 +54,8 @@ public class StringSerializer implements OrderPreservingSerializer<String>, Supp
 
 
     private final CharacterSerializer cs = new CharacterSerializer();
+
+    private static final Logger logger = LoggerFactory.getLogger(StringSerializer.class);
 
     @Override
     public String readByteOrder(ScanBuffer buffer) {
@@ -97,18 +103,25 @@ public class StringSerializer implements OrderPreservingSerializer<String>, Supp
 
     @Override
     public String read(ScanBuffer buffer) {
+        logger.trace("StringSerializer: starting deserializing string ----------------");
         long length = VariableLong.readPositive(buffer);
+        logger.trace("StringSerializer: length {}", length);
         if (length==0) return null;
 
         long compressionId = length & COMPRESSOR_BIT_MASK;
         assert compressionId<MAX_NUM_COMPRESSORS;
+        logger.trace("StringSerializer: compressionId {}", compressionId);
         CompressionType compression = CompressionType.getFromId((int)compressionId);
         length = (length>>>COMPRESSOR_BIT_LEN);
+        logger.trace("StringSerializer: length after retrieve {}", length);
         String value;
         if (compression==CompressionType.NO_COMPRESSION) {
             if ( (length&1)==0) { //ASCII encoding
                 length = length>>>1;
-                if (length==1) value="";
+                if (length==1) {
+                    logger.trace("StringSerializer: length is 1, return value empty");
+                    value="";
+                }
                 else if (length==2) {
                     StringBuilder sb = new StringBuilder();
                     while (true) {
@@ -117,6 +130,7 @@ public class StringSerializer implements OrderPreservingSerializer<String>, Supp
                         if ((c & 0x80) > 0) break;
                     }
                     value = sb.toString();
+                    logger.trace("StringSerializer: length is 2, return value {}", value);
                 } else throw new IllegalArgumentException("Invalid ASCII encoding offset: " + length);
             } else { //variable full UTF encoding
                 length = length>>>1;
@@ -145,10 +159,12 @@ public class StringSerializer implements OrderPreservingSerializer<String>, Supp
                     }
                 }
                 value = sb.toString();
+                logger.trace("StringSerializer: variable full UTF encoding length is {}, return value {}", length, value);
             }
         } else {
             assert length<=Integer.MAX_VALUE;
             value = compression.decompress(buffer,(int)length);
+            logger.trace("StringSerializer: gzip decompression length {}, return value {}", length, value);
         }
         return value;
     }
@@ -253,7 +269,11 @@ public class StringSerializer implements OrderPreservingSerializer<String>, Supp
                     int len;
                     while ((len = in.read(bytes)) > 0)
                         baos.write(bytes, 0, len);
-                    return new String(baos.toByteArray(), StandardCharsets.UTF_8);
+                    String value = new String(baos.toByteArray(), StandardCharsets.UTF_8);
+                    logger.trace("StringSerializer: gzip decompression " +
+                            "inputstream available {} numBytes {} outputstream len {} baos array {} return value {}",
+                        in.available(), numBytes, len, Arrays.toString(baos.toByteArray()), value);
+                    return value;
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }

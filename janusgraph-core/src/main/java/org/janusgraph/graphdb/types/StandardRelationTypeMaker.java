@@ -98,6 +98,10 @@ public abstract class StandardRelationTypeMaker implements RelationTypeMaker {
         for (int i = 0; i < sig.size(); i++) {
             PropertyKey key = sig.get(i);
             Preconditions.checkNotNull(key);
+            System.out.println("checkSignature: "+ key.name() + " ");
+            if(((PropertyKey) key).dataType()== null){
+                System.out.println("propertyKey : "+ key.name() + " datatype is null" );
+            }
             Preconditions.checkArgument(!((PropertyKey) key).dataType().equals(Object.class),
                     "Signature and sort keys must have a proper declared datatype: %s", key.name());
             signature[i] = key.longId();
@@ -127,6 +131,7 @@ public abstract class StandardRelationTypeMaker implements RelationTypeMaker {
     public StandardRelationTypeMaker signature(PropertyKey... types) {
         Preconditions.checkArgument(types!=null && types.length>0);
         signature.addAll(Arrays.asList(types));
+        System.out.println("Add list of types: " + Arrays.asList(types));
         return this;
     }
 

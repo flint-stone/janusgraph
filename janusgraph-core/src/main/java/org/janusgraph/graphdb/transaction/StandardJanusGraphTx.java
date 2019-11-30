@@ -831,6 +831,7 @@ public class StandardJanusGraphTx extends JanusGraphBlueprintsTransaction implem
     @Override
     public Iterable<JanusGraphEdge> getEdges(RelationIdentifier... ids) {
         verifyOpen();
+        log.trace("StandardJanusGraphTx: getEdgess");
         if (ids==null || ids.length==0) return new VertexCentricEdgeIterable(getInternalVertices(),RelationCategory.EDGE);
 
         if (null != config.getGroupName()) {
@@ -1099,6 +1100,9 @@ public class StandardJanusGraphTx extends JanusGraphBlueprintsTransaction implem
     }
 
     public void executeMultiQuery(final Collection<InternalVertex> vertices, final SliceQuery sq, final QueryProfiler profiler) {
+        log.trace("StandardJanusGraphTx: executeMultiQuery SliceQuery {} {}",
+            Arrays.toString(sq.getSliceStart().asByteBuffer().array()),
+            Arrays.toString(sq.getSliceEnd().asByteBuffer().array()));
         LongArrayList vertexIds = new LongArrayList(vertices.size());
         for (InternalVertex v : vertices) {
             if (!v.isNew() && v.hasId() && (v instanceof CacheVertex) && !v.hasLoadedRelations(sq)) vertexIds.add(v.longId());
@@ -1171,6 +1175,9 @@ public class StandardJanusGraphTx extends JanusGraphBlueprintsTransaction implem
 
         @Override
         public Iterator<JanusGraphRelation> execute(final VertexCentricQuery query, final SliceQuery sq, final Object exeInfo, final QueryProfiler profiler) {
+            log.trace("StandardJanusGraphTx: execute SliceQuery {} {}",
+                Arrays.toString(sq.getSliceStart().asByteBuffer().array()),
+                Arrays.toString(sq.getSliceEnd().asByteBuffer().array()));
             assert exeInfo==null;
             if (query.getVertex().isNew())
                 return Collections.emptyIterator();
@@ -1204,10 +1211,11 @@ public class StandardJanusGraphTx extends JanusGraphBlueprintsTransaction implem
         @Override
         public Iterator<JanusGraphElement> getNew(final GraphCentricQuery query) {
             //If the query is unconstrained then we don't need to add new elements, so will be picked up by getVertices()/getEdges() below
+            log.trace("StandardJanusGraphTx: getNew {} ", query.numSubQueries());
             if (query.numSubQueries()==1 && query.getSubQuery(0).getBackendQuery().isEmpty())
                 return Collections.emptyIterator();
             Preconditions.checkArgument(query.getCondition().hasChildren(),"If the query is non-empty it needs to have a condition");
-
+            log.trace("StandardJanusGraphTx: ResultType {} ", query.getResultType());
             if (query.getResultType() == ElementCategory.VERTEX && hasModifications()) {
                 Preconditions.checkArgument(QueryUtil.isQueryNormalForm(query.getCondition()));
                 PredicateCondition<PropertyKey, JanusGraphElement> standardIndexKey = getEqualityCondition(query.getCondition());

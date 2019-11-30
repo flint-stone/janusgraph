@@ -409,6 +409,9 @@ public class StandardJanusGraph extends JanusGraphBlueprintsGraph {
         if (backend.getStoreFeatures().hasUnorderedScan()) {
             keyIterator = tx.edgeStoreKeys(vertexExistenceQuery);
         } else {
+            log.trace("{}: Get minimum key {} max key {}", new Throwable().getStackTrace()[0].getMethodName(),
+                Arrays.toString(IDHandler.MIN_KEY.asByteBuffer().array()),
+                Arrays.toString(IDHandler.MAX_KEY.asByteBuffer().array()));
             keyIterator = tx.edgeStoreKeys(new KeyRangeQuery(IDHandler.MIN_KEY, IDHandler.MAX_KEY, vertexExistenceQuery));
         }
 

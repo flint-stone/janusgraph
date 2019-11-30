@@ -17,6 +17,9 @@ package org.janusgraph.diskstorage.util;
 import com.google.common.base.Preconditions;
 import org.janusgraph.diskstorage.ReadBuffer;
 import org.janusgraph.diskstorage.StaticBuffer;
+import org.janusgraph.graphdb.idmanagement.IDManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 
@@ -32,8 +35,9 @@ import java.nio.ByteBuffer;
 public class StaticArrayBuffer implements StaticBuffer {
 
     private final byte[] array;
-    private int offset;
+    public int offset;
     private int limit;
+    private static final Logger logger = LoggerFactory.getLogger(StaticBuffer.class);
 
     public StaticArrayBuffer(byte[] array, int offset, int limit) {
         assert array != null;
@@ -204,6 +208,7 @@ public class StaticArrayBuffer implements StaticBuffer {
     @Override
     public long getLong(int position) {
         int offset = require(position, LONG_LEN);
+        logger.trace("StaticArrayBuffer: offset {} position {}", offset, position);
         return getLong(array,offset);
     }
 

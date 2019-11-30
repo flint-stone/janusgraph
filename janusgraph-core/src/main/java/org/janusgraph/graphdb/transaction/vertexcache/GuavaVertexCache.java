@@ -17,10 +17,12 @@ package org.janusgraph.graphdb.transaction.vertexcache;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.*;
 import org.janusgraph.graphdb.internal.InternalVertex;
+import org.janusgraph.graphdb.types.VertexLabelVertex;
 import org.janusgraph.graphdb.vertices.AbstractVertex;
 import org.janusgraph.util.datastructures.Retriever;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentMap;
@@ -36,6 +38,7 @@ public class GuavaVertexCache implements VertexCache {
 
     private final ConcurrentMap<Long, InternalVertex> volatileVertices;
     private final Cache<Long, InternalVertex> cache;
+    private final HashSet<Long> idSet;
 
     public GuavaVertexCache(final long maxCacheSize, final int concurrencyLevel, final int initialDirtySize) {
         volatileVertices = new NonBlockingHashMapLong<>(initialDirtySize);
@@ -56,6 +59,7 @@ public class GuavaVertexCache implements VertexCache {
                 })
                 .build();
         log.debug("Created vertex cache with max size {}", maxCacheSize);
+        idSet = new HashSet<>();
     }
 
     @Override
@@ -91,10 +95,19 @@ public class GuavaVertexCache implements VertexCache {
         Preconditions.checkNotNull(vertex);
         Preconditions.checkArgument(id != 0);
         Long vertexId = id;
-
+        //log.trace("GuavaVertexCache put vertex Id {} vertex {} {}", vertexId, vertex.vertexLabel(), vertex.toString());
         cache.put(vertexId, vertex);
-        if (vertex.isNew() || vertex.hasAddedRelations())
+        if (vertex.isNew() || vertex.hasAddedRelations()){
+            //if(!(vertex.vertexLabel() instanceof VertexLabelVertex))
+//            if(!idSet.contains(vertexId) && !vertex.toString().contains("[")){
+//                idSet.add(vertexId);
+//                log.debug("GuavaVertexCache hasAddedRelations put vertex Id {} vertex {} {}", vertexId, vertex.vertexLabel(), vertex.toString());
+//            }
+            //log.debug("GuavaVertexCache hasAddedRelations put vertex Id {} vertex {} ", vertexId, vertex.vertexLabel());
             volatileVertices.put(vertexId, vertex);
+        }
+        //if(vertex!=null && vertex.vertexLabel()!=null)
+        //log.debug("GuavaVertexCache hasAddedRelations put vertex Id {} vertex {}", vertexId, vertex.vertexLabel(), vertex.getClass().getName());
     }
 
     @Override

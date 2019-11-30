@@ -187,6 +187,8 @@ public class VariableLong {
             //Keep writing
             writeUnsigned(out, valueLen, value);
         }
+        logger.trace("VariableLong: writePositiveWithPrefix: first {} valueLen {} value {} deltaLen {} mod {}",
+            first, valueLen, value, deltaLen, mod );
     }
 
     public static int positiveWithPrefixLength(final long value, final int prefixBitLen) {

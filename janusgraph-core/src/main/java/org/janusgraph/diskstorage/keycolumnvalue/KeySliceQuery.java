@@ -18,6 +18,12 @@ import org.janusgraph.diskstorage.StaticBuffer;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.Arrays;
+
+import static org.janusgraph.diskstorage.BackendTransaction.EDGESTORE_MIN_KEY;
 
 /**
  * Extends {@link SliceQuery} by a key that identifies the location of the slice in the key-ring.
@@ -26,15 +32,22 @@ import com.google.common.base.Preconditions;
 
 public class KeySliceQuery extends SliceQuery {
 
+    private static final Logger log = LoggerFactory.getLogger(KeySliceQuery.class);
     private final StaticBuffer key;
 
     public KeySliceQuery(StaticBuffer key, StaticBuffer sliceStart, StaticBuffer sliceEnd) {
         super(sliceStart, sliceEnd);
+        log.trace("{}: sliceStart {} sliceEnd {}", new Throwable().getStackTrace()[0].getMethodName(),
+            Arrays.toString(sliceStart.asByteBuffer().array()),
+            Arrays.toString(sliceEnd.asByteBuffer().array()));
         this.key = Preconditions.checkNotNull(key);
     }
 
     public KeySliceQuery(StaticBuffer key, SliceQuery query) {
         super(query);
+        log.trace("{}: Get minimum key {} max key {}", new Throwable().getStackTrace()[0].getMethodName(),
+            Arrays.toString(query.getSliceStart().asByteBuffer().array()),
+            Arrays.toString(query.getSliceEnd().asByteBuffer().array()));
         this.key = Preconditions.checkNotNull(key);
     }
 

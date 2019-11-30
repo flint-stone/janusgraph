@@ -51,7 +51,7 @@ public class IDHandler {
             this.id = id;
         }
 
-        private int getRelationType() {
+        private int  getRelationType() {
             return id >>> 1;
         }
 
@@ -122,6 +122,7 @@ public class IDHandler {
         assert relationTypeId > 0 && (relationTypeId << 1) > 0; //Check positive and no-overflow
 
         long strippedId = (IDManager.stripEntireRelationTypePadding(relationTypeId) << 1) + dirID.getDirectionInt();
+        logger.trace("IDHandler: writeRelationType strippedId {} relationTypeId {} dirID {} invisible {}", strippedId, relationTypeId, dirID, invisible);
         VariableLong.writePositiveWithPrefix(out, strippedId, dirID.getPrefix(invisible, IDManager.isSystemRelationTypeId(relationTypeId)), PREFIX_BIT_LEN);
     }
 
@@ -195,6 +196,7 @@ public class IDHandler {
         }
         end++;
         assert end > start;
+        logger.trace("IDHandler getBounds: systemTypes {} type {} start {} end {}", systemTypes, type, getPrefixed(start), getPrefixed(end));
         return new StaticBuffer[]{getPrefixed(start), getPrefixed(end)};
     }
 

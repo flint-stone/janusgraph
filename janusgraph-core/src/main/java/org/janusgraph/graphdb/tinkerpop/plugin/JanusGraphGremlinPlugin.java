@@ -73,7 +73,10 @@ import org.janusgraph.core.schema.SchemaInspector;
 import org.janusgraph.core.schema.SchemaManager;
 import org.janusgraph.core.schema.SchemaStatus;
 import org.janusgraph.core.schema.VertexLabelMaker;
+import org.janusgraph.example.ExpGraphFactory;
 import org.janusgraph.example.GraphOfTheGodsFactory;
+import org.janusgraph.example.PlayGroundGraphQuery;
+import org.janusgraph.example.SimpleGraphFactory;
 import org.janusgraph.graphdb.database.management.ManagementSystem;
 import org.janusgraph.graphdb.management.ConfigurationManagementGraph;
 import org.janusgraph.graphdb.tinkerpop.JanusGraphIoRegistry;
@@ -178,6 +181,9 @@ public class JanusGraphGremlinPlugin extends AbstractGremlinPlugin {
         CLASS_IMPORTS.add(VertexLabelMaker.class);
 
         CLASS_IMPORTS.add(GraphOfTheGodsFactory.class);
+        CLASS_IMPORTS.add(PlayGroundGraphQuery.class);
+        CLASS_IMPORTS.add(SimpleGraphFactory.class);
+        CLASS_IMPORTS.add(ExpGraphFactory.class);
         CLASS_IMPORTS.add(JanusGraphIoRegistry.class);
         CLASS_IMPORTS.add(ConfigurationManagementGraph.class);
         CLASS_IMPORTS.add(ManagementSystem.class);
@@ -242,7 +248,10 @@ public class JanusGraphGremlinPlugin extends AbstractGremlinPlugin {
     }
 
     private static final ImportCustomizer IMPORTS = DefaultImportCustomizer.build()
-        .addClassImports(CLASS_IMPORTS)
+        .
+
+
+            addClassImports(CLASS_IMPORTS)
         .addEnumImports(ENUM_IMPORTS)
         .addMethodImports(METHOD_IMPORTS)
         .create();

@@ -19,7 +19,12 @@ import com.google.common.base.Preconditions;
 import org.janusgraph.core.InvalidIDException;
 import org.janusgraph.diskstorage.StaticBuffer;
 import org.janusgraph.diskstorage.util.BufferUtil;
+import org.janusgraph.graphdb.database.EdgeSerializer;
 import org.janusgraph.graphdb.database.idhandling.VariableLong;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.Arrays;
 
 /**
  * Handles the allocation of ids based on the type of element
@@ -56,6 +61,8 @@ public class IDManager {
      *
      *
      */
+
+    private static final Logger logger = LoggerFactory.getLogger(IDManager.class);
     public enum VertexIDType {
         UserVertex {
             @Override
@@ -455,9 +462,18 @@ public class IDManager {
 
     private static VertexIDType getUserVertexIDType(long vertexId) {
         VertexIDType type=null;
-        if (VertexIDType.NormalVertex.is(vertexId)) type=VertexIDType.NormalVertex;
-        else if (VertexIDType.PartitionedVertex.is(vertexId)) type=VertexIDType.PartitionedVertex;
-        else if (VertexIDType.UnmodifiableVertex.is(vertexId)) type=VertexIDType.UnmodifiableVertex;
+        if (VertexIDType.NormalVertex.is(vertexId)) {
+            logger.trace("IDManager: NormalVertex id {}", vertexId);
+            type=VertexIDType.NormalVertex;
+        }
+        else if (VertexIDType.PartitionedVertex.is(vertexId)) {
+            logger.trace("IDManager: PartitionedVertex id {}", vertexId);
+            type=VertexIDType.PartitionedVertex;
+        }
+        else if (VertexIDType.UnmodifiableVertex.is(vertexId)) {
+            logger.trace("IDManager: UnmodifiableVertex id {}", vertexId);
+            type=VertexIDType.UnmodifiableVertex;
+        }
         if (null == type) {
             throw new InvalidIDException("Vertex ID " + vertexId + " has unrecognized type");
         }
@@ -480,7 +496,10 @@ public class IDManager {
     public StaticBuffer getKey(long vertexId) {
         if (VertexIDType.Schema.is(vertexId)) {
             //No partition for schema vertices
-            return BufferUtil.getLongBuffer(vertexId);
+            StaticBuffer ret = BufferUtil.getLongBuffer(vertexId);
+            byte[] arr = ret.as(StaticBuffer.ARRAY_FACTORY);
+            logger.trace("1 IDManager: key {} to {}", vertexId, Arrays.copyOfRange(arr, 0, arr.length));
+            return ret;
         } else {
             assert isUserVertexId(vertexId);
             VertexIDType type = getUserVertexIDType(vertexId);
@@ -489,18 +508,26 @@ public class IDManager {
             long count = vertexId>>>(partitionBits+USERVERTEX_PADDING_BITWIDTH);
             assert count>0;
             long keyId = (partition<<partitionOffset) | type.addPadding(count);
-            return BufferUtil.getLongBuffer(keyId);
+            StaticBuffer ret = BufferUtil.getLongBuffer(keyId);
+            byte[] arr = ret.as(StaticBuffer.ARRAY_FACTORY);
+            logger.trace("2 IDManager: partitionBits {} USERVERTEX_PADDING_BITWIDTH {} partitionOffset {} count {} key {} to {}",
+                partitionBits, USERVERTEX_PADDING_BITWIDTH, partitionOffset, count, vertexId, Arrays.copyOfRange(arr, 0, arr.length));
+            return ret;
         }
     }
 
     public long getKeyID(StaticBuffer b) {
         long value = b.getLong(0);
+        logger.trace("IDManager: value {} b.offset {} size {}", value, b);
         if (VertexIDType.Schema.is(value)) {
+            logger.trace("IDManager: ID {} is Schema type", value);
             return value;
         } else {
             VertexIDType type = getUserVertexIDType(value);
             long partition = partitionOffset<Long.SIZE?value>>>partitionOffset:0;
             long count = (value>>>USERVERTEX_PADDING_BITWIDTH) & ((1L <<(partitionOffset-USERVERTEX_PADDING_BITWIDTH))-1);
+            logger.trace("IDManager: construct ID count {} partition {} type {} partitionOffset {} USERVERTEX_PADDING_BITWIDTH {}",
+                count, partition, type, partitionOffset, USERVERTEX_PADDING_BITWIDTH);
             return constructId(count,partition,type);
         }
     }

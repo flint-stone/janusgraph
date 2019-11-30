@@ -17,7 +17,12 @@ package org.janusgraph.diskstorage.keycolumnvalue;
 import org.janusgraph.diskstorage.StaticBuffer;
 
 import com.google.common.base.Preconditions;
+import org.janusgraph.diskstorage.keycolumnvalue.keyvalue.OrderedKeyValueStoreAdapter;
+import org.janusgraph.graphdb.database.idhandling.IDHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
 import java.util.Objects;
 
 /**
@@ -34,6 +39,8 @@ import java.util.Objects;
  */
 
 public class KeyRangeQuery extends SliceQuery {
+
+    private static final Logger log = LoggerFactory.getLogger(KeyRangeQuery.class);
 
     private final StaticBuffer keyStart;
     private final StaticBuffer keyEnd;
@@ -69,6 +76,9 @@ public class KeyRangeQuery extends SliceQuery {
 
     @Override
     public KeyRangeQuery updateLimit(int newLimit) {
+        log.trace("{}: Get minimum key {} max key {}", new Throwable().getStackTrace()[0].getMethodName(),
+            Arrays.toString(keyStart.asByteBuffer().array()),
+            Arrays.toString(keyEnd.asByteBuffer().array()));
         return new KeyRangeQuery(keyStart,keyEnd,this).setLimit(newLimit);
     }
 
