@@ -45,6 +45,9 @@ import org.apache.tinkerpop.gremlin.structure.Direction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
+import java.io.FileWriter;
+import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
@@ -70,13 +73,21 @@ public class EdgeSerializer implements RelationReader {
     private final HashSet<Tuple4<Long, Boolean, Boolean, Boolean>> set1;
     private final HashSet<Tuple4<Long, Boolean, Boolean, Boolean>> set2;
     private final HashSet<Tuple2<Long, String>> set3;
+    private PrintWriter pw;
 
     public EdgeSerializer(Serializer serializer) {
-
         this.serializer = serializer;
         set1 = new HashSet<>();
         set2 = new HashSet<>();
         set3 = new HashSet<>();
+//        try{
+//            pw = new PrintWriter("file1.csv");
+//        }
+//        catch(Exception e){
+//            pw.close();
+//            e.printStackTrace();
+//        }
+
     }
 
     public RelationCache readRelation(Entry data, boolean parseHeaderOnly, TypeInspector tx) {
@@ -314,6 +325,22 @@ public class EdgeSerializer implements RelationReader {
             set1.add(tup);
             logger.debug("Write EdgeSerializer writeRelation: type id {} relationType.isEdgeLabel {} multiplicity.isConstrained {} multiplicity.isUnique(dir) {} sortOrder {} invisible {}",
                 typeId, type.isEdgeLabel(), multiplicity.isConstrained(), multiplicity.isUnique(dir), type.getSortOrder(), type.isInvisibleType());
+            try {
+                FileWriter fw = new FileWriter("file1.csv", true);
+                pw = new PrintWriter(fw);
+                StringBuilder sb = new StringBuilder();
+                sb.append(typeId + ",");
+                sb.append(multiplicity.isConstrained() + ",");
+                sb.append(multiplicity.isUnique(dir) + ",");
+                sb.append(type.isInvisibleType());
+                sb.append("\n");
+                pw.write(sb.toString());
+                pw.close();
+            }
+            catch(Exception e){
+                pw.close();
+                e.printStackTrace();
+            }
         }
 
         long[] sortKey = type.getSortKey();
