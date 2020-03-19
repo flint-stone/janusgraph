@@ -74,6 +74,7 @@ public class EdgeSerializer implements RelationReader {
     private final HashSet<Tuple2<Long, String>> set3;
     private final HashMap<Long, String> set4;
     private final HashMap<Long, String> set5;
+    private final HashMap<Long, String> set6;
 
     private PrintWriter pws[];
 
@@ -84,6 +85,7 @@ public class EdgeSerializer implements RelationReader {
         set3 = new HashSet<>();
         set4 = new HashMap<>();
         set5 = new HashMap<>();
+        set6 = new HashMap<>();
 
 //        PrintWriter pw = new PrintWriter(new FileOutputStream(
 //            new File("persons.txt"),
@@ -94,7 +96,8 @@ public class EdgeSerializer implements RelationReader {
                 new PrintWriter(new FileOutputStream(new File("typeIDToEdgeLabel.csv")), true), // EdgeSerializer edge: otherVertexId
                 new PrintWriter(new FileOutputStream(new File("typeIDToProperties.csv")), true), // Write EdgeSerializer parseRelation:
                 new PrintWriter(new FileOutputStream(new File("typeIDToPropertyName.csv")), true), // EdgeSerializer property: otherVertexId
-                new PrintWriter(new FileOutputStream(new File("typeIDToPropertyNameRemaining.csv")), true) // EdgeSerializer remaining: writeInline
+                new PrintWriter(new FileOutputStream(new File("typeIDToPropertyNameRemaining.csv")), true), // EdgeSerializer remaining: writeInline
+                new PrintWriter(new FileOutputStream(new File("typeIDToVertexLabel.csv")), true) // EdgeSerializer remaining: writeInline
             };
 
         }
@@ -326,12 +329,12 @@ public class EdgeSerializer implements RelationReader {
 
         DataOutput out = serializer.getDataOutput(DEFAULT_CAPACITY);
         int valuePosition;
-        logger.trace("EdgeSerializer typelabel {} typeId {} typename {} dirId {} isInvisibleType {}",
-            type.label(), typeId, type.name(), dirID.getDirection(), type.isInvisibleType());
+        logger.trace("EdgeSerializer type label {} vertex label {} typeId {} typename {} dirId {} isInvisibleType {}",
+            type.label(), type.vertexLabel(), typeId, type.name(), dirID.getDirection(), type.isInvisibleType());
         IDHandler.writeRelationType(out, typeId, dirID, type.isInvisibleType());
         Multiplicity multiplicity = type.multiplicity();
 
-        logger.trace("Write EdgeSerializer writeRelation: type id {} relationType.isEdgeLabel {} multiplicity.isConstrained {} multiplicity.isUnique(dir) {}",
+        logger.trace("Write EdgeSerializer writeRelation: type id {} relationType.isEdgeLabel {} multiplicity.isConstrained {} multiplicity.isUnique {} ",
             typeId, type.isEdgeLabel(), multiplicity.isConstrained(), multiplicity.isUnique(dir));
 
 //        RelationType relationType = tx.getExistingRelationType(typeId);
@@ -345,8 +348,9 @@ public class EdgeSerializer implements RelationReader {
                 typeId, type.isEdgeLabel(), multiplicity.isConstrained(), multiplicity.isUnique(dir), type.getSortOrder(), type.isInvisibleType());
                 StringBuilder sb = new StringBuilder();
                 sb.append(typeId + ",");
+                sb.append(type.isEdgeLabel() + ",");
                 sb.append(multiplicity.isConstrained() + ",");
-                sb.append(multiplicity.isUnique(dir) + ",");
+                sb.append(multiplicity.isUnique(dir));
                 sb.append(type.isInvisibleType());
                 pws[0].println(sb.toString());
                 pws[0].flush();
@@ -366,14 +370,23 @@ public class EdgeSerializer implements RelationReader {
         if (relation.isEdge()) {
             long otherVertexId = relation.getVertex((position + 1) % 2).longId();
             Tuple2<Long, String> tuple2 = new Tuple2<>(typeId, relation.label());
+            logger.debug("EdgeSerializer edge: otherVertexId {} typeId {} relationId {} relationLabel {} relation-0 {} relation-1 {} relation keys {}", otherVertexId, typeId, relationId, relation.label(), relation.getVertex(0), relation.getVertex(1), String.join(",", relation.keys()));
             if(!set3.contains(tuple2)){
-                logger.debug("EdgeSerializer edge: otherVertexId {} typeId {} relationId {} relationLabel {}",otherVertexId, typeId, relationId, relation.label());
                 set3.add(tuple2);
                 StringBuilder sb = new StringBuilder();
                 sb.append(typeId + ",");
                 sb.append(relation.label());
                 pws[1].println(sb.toString());
                 pws[1].flush();
+
+            }
+            if(!set6.containsKey(otherVertexId)){
+                set6.put(otherVertexId, relation.getVertex(1).toString());
+                StringBuilder sb = new StringBuilder();
+                sb.append(otherVertexId + ",");
+                sb.append(relation.getVertex(1));
+                pws[5].println(sb.toString());
+                pws[5].flush();
             }
 
             if (multiplicity.isConstrained()) {
@@ -408,34 +421,42 @@ public class EdgeSerializer implements RelationReader {
                         "supportsNullSerialization {} " +
                         "DataTypeRegistrationNo {} " +
                         "Datatype {} " +
-                        "byteOrder {}",
+                        "byteOrder {}" +
+                        "registrationNo {}" +
+                        "relation-0 {}",
                     typeId,
                     AttributeUtil.hasGenericDataType(key),
                     serializer.supportsNullSerialization(key.dataType()),
                     serializer.getDataTypeRegistration(key.dataType()),
                     serializer.getDataType(serializer.getDataTypeRegistration(key.dataType())),
-                    InlineType.NORMAL.writeByteOrdered()
+                    InlineType.NORMAL.writeByteOrdered(),
+                    serializer.getDataTypeRegistration(key.dataType()),
+                    relation.getVertex(0)
                 );
                 StringBuilder sb = new StringBuilder();
                 sb.append(typeId + ",");
                 sb.append(AttributeUtil.hasGenericDataType(key) + ",");
                 sb.append(serializer.supportsNullSerialization(key.dataType()) + ",");
-                sb.append(InlineType.NORMAL.writeByteOrdered());
+                sb.append(InlineType.NORMAL.writeByteOrdered() + ",");
+                sb.append(serializer.getDataTypeRegistration(key.dataType()));
                 pws[2].println(sb.toString());
                 pws[2].flush();
             }
 
             assert key.dataType().isInstance(value);
 
-            if(!set4.containsKey(typeId)){
-                logger.debug("EdgeSerializer property: otherVertexId label {} name {} relationName {} typeId {} relationId {}", key.label(), key.name(), value, typeId, relationId);
+//            if(!set4.containsKey(typeId)){
+                logger.debug("EdgeSerializer property: otherVertexId label {} name {} relationName {} typeId {} relationId {} registrationNo {}", key.label(), key.name(), value, typeId, relationId, serializer.getDataTypeRegistration(key.dataType()));
                 StringBuilder sb = new StringBuilder();
                 sb.append(typeId + ",");
-                sb.append(key.name());
+                sb.append(key.name() + ",");
+                sb.append(serializer.getDataTypeRegistration(key.dataType()));
+
+
                 pws[3].println(sb.toString());
                 pws[3].flush();
                 set4.put(typeId, key.name());
-            }
+//            }
 
             if (multiplicity.isConstrained()) {
                 if (multiplicity.isUnique(dir)) { //Cardinality=SINGLE
@@ -476,16 +497,17 @@ public class EdgeSerializer implements RelationReader {
         for (long tid : remaining) {
             PropertyKey t = tx.getExistingPropertyKey(tid);
             writeInline(out, t, relation.getValueDirect(t), InlineType.NORMAL);
-            if(!set5.containsKey(tid)){
-                logger.debug("EdgeSerializer remaining: writeInline name {} label {} value {} tid {}",
-                    t.name(),  t.label(), relation.getValueDirect(t), tid);
+//            if(!set5.containsKey(tid)){
+                logger.debug("EdgeSerializer remaining: writeInline name {} label {} value {} tid {} registration {}",
+                    t.name(),  t.label(), relation.getValueDirect(t), tid, serializer.getDataTypeRegistration(t.dataType()));
                 StringBuilder sb = new StringBuilder();
                 sb.append(tid + ",");
-                sb.append(t.name());
+                sb.append(t.name() + ",");
+                sb.append(serializer.getDataTypeRegistration(t.dataType()));
                 pws[4].println(sb.toString());
                 pws[4].flush();
                 set5.put(tid, t.name());
-            }
+//            }
         }
         assert valuePosition>0;
 
