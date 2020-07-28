@@ -50,7 +50,7 @@ public class GraphOfTheGodsFactory {
         JanusGraphFactory.Builder config = JanusGraphFactory.build();
         config.set("storage.backend", "berkeleyje");
         config.set("storage.directory", directory);
-        // config.set("index." + INDEX_NAME + ".backend", "elasticsearch");
+        config.set("index." + INDEX_NAME + ".backend", "elasticsearch");
 
         JanusGraph graph = config.open();
         GraphOfTheGodsFactory.load(graph);
@@ -65,39 +65,38 @@ public class GraphOfTheGodsFactory {
         load(graph, INDEX_NAME, true);
     }
 
-
     private static boolean mixedIndexNullOrExists(StandardJanusGraph graph, String indexName) {
         return indexName == null || graph.getIndexSerializer().containsIndex(indexName);
     }
 
     public static void load(final JanusGraph graph, String mixedIndexName, boolean uniqueNameCompositeIndex) {
         if (graph instanceof StandardJanusGraph) {
-            Preconditions.checkState(mixedIndexNullOrExists((StandardJanusGraph)graph, mixedIndexName),
+            Preconditions.checkState(mixedIndexNullOrExists((StandardJanusGraph)graph, mixedIndexName), 
                     ERR_NO_INDEXING_BACKEND, mixedIndexName);
         }
 
         //Create Schema
         JanusGraphManagement management = graph.openManagement();
         final PropertyKey name = management.makePropertyKey("name").dataType(String.class).make();
-//        JanusGraphManagement.IndexBuilder nameIndexBuilder = management.buildIndex("name", Vertex.class).addKey(name);
-//        if (uniqueNameCompositeIndex)
-//            nameIndexBuilder.unique();
-//        JanusGraphIndex nameIndex = nameIndexBuilder.buildCompositeIndex();
-//        management.setConsistency(nameIndex, ConsistencyModifier.LOCK);
+        JanusGraphManagement.IndexBuilder nameIndexBuilder = management.buildIndex("name", Vertex.class).addKey(name);
+        if (uniqueNameCompositeIndex)
+            nameIndexBuilder.unique();
+        JanusGraphIndex nameIndex = nameIndexBuilder.buildCompositeIndex();
+        management.setConsistency(nameIndex, ConsistencyModifier.LOCK);
         final PropertyKey age = management.makePropertyKey("age").dataType(Integer.class).make();
-//        if (null != mixedIndexName)
-//            management.buildIndex("vertices", Vertex.class).addKey(age).buildMixedIndex(mixedIndexName);
+        if (null != mixedIndexName)
+            management.buildIndex("vertices", Vertex.class).addKey(age).buildMixedIndex(mixedIndexName);
 
         final PropertyKey time = management.makePropertyKey("time").dataType(Integer.class).make();
         final PropertyKey reason = management.makePropertyKey("reason").dataType(String.class).make();
         final PropertyKey place = management.makePropertyKey("place").dataType(Geoshape.class).make();
-//        if (null != mixedIndexName)
-//            management.buildIndex("edges", Edge.class).addKey(reason).addKey(place).buildMixedIndex(mixedIndexName);
+        if (null != mixedIndexName)
+            management.buildIndex("edges", Edge.class).addKey(reason).addKey(place).buildMixedIndex(mixedIndexName);
 
         management.makeEdgeLabel("father").multiplicity(Multiplicity.MANY2ONE).make();
         management.makeEdgeLabel("mother").multiplicity(Multiplicity.MANY2ONE).make();
         EdgeLabel battled = management.makeEdgeLabel("battled").signature(time).make();
-        //management.buildEdgeIndex(battled, "battlesByTime", Direction.BOTH, Order.desc, time);
+        management.buildEdgeIndex(battled, "battlesByTime", Direction.BOTH, Order.desc, time);
         management.makeEdgeLabel("lives").signature(reason).make();
         management.makeEdgeLabel("pet").make();
         management.makeEdgeLabel("brother").make();

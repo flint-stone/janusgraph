@@ -41,9 +41,9 @@ public class LdbcGraphFactory {
 	static HashMap<String, HashMap<Long, Long>>  _label_ids_map = new HashMap<String, HashMap<Long, Long>>();
     static HashMap<String, String> _name_map = new HashMap<>();
     static ArrayList<String> _cur_files = new ArrayList<String>();
-    static String _poperty_file_path = "/Users/lisu/Documents/Data/LDBC_properties.txt";
-    static String _prefix_path = "/Users/lisu/Documents/Data/1w/data/";
-    static String _folder_name = "data";
+    static String _poperty_file_path = "/home/houbai/documents/LDBC_properties.txt";
+    static String _prefix_path = "/home/houbai/documents/data/ldbc_graph_0.1/";
+    static String _folder_name = "ldbc_graph_0.1";
     static ArrayList<String> vertexLabels = new ArrayList<>();
     static HashSet<String> edgeLabels = new HashSet<>();
     static HashMap<String, String>propertyTypes = new HashMap<>();
@@ -114,11 +114,13 @@ public class LdbcGraphFactory {
         _cur_files.add(_prefix_path + "forum_hasModerator_person_0_0.csv");
         _cur_files.add(_prefix_path + "forum_hasTag_tag_0_0.csv");
         _cur_files.add(_prefix_path + "organisation_isLocatedIn_place_0_0.csv");
+        //_cur_files.add(_prefix_path + "person_email_emailaddress_0_0.csv");
         _cur_files.add(_prefix_path + "person_hasInterest_tag_0_0.csv");
         _cur_files.add(_prefix_path + "person_isLocatedIn_place_0_0.csv");
         _cur_files.add(_prefix_path + "person_knows_person_0_0.csv");
         _cur_files.add(_prefix_path + "person_likes_comment_0_0.csv");
         _cur_files.add(_prefix_path + "person_likes_post_0_0.csv");
+        //_cur_files.add(_prefix_path + "person_speaks_language_0_0.csv");
         _cur_files.add(_prefix_path + "person_studyAt_organisation_0_0.csv");
         _cur_files.add(_prefix_path + "person_workAt_organisation_0_0.csv");
         _cur_files.add(_prefix_path + "place_isPartOf_place_0_0.csv");
@@ -138,8 +140,39 @@ public class LdbcGraphFactory {
         }
     }
 
+    static void get_extra_property_files() {
+        _cur_files.clear();
+        _cur_files.add(_prefix_path + "person_email_emailaddress_0_0.csv");
+        _cur_files.add(_prefix_path + "person_speaks_language_0_0.csv");
+    }
+
+   static long encode_datetime(String datetime) {
+        String[] parts = datetime.split("T");
+        long dt_value = 0; 
+        String[] date_parts = parts[0].split("-");
+        dt_value += Long.valueOf(date_parts[0]); // add year
+        dt_value = dt_value * 100 + Long.valueOf(date_parts[1]); // add month
+        dt_value = dt_value * 100 + Long.valueOf(date_parts[2]); // add day
+        String[] time_parts = parts[1].split("\\+")[0].split("\\.")[0].split(":");
+        String mirco_seconds = parts[1].split("\\+")[0].split("\\.")[1];
+        dt_value = dt_value * 100 + Long.valueOf(time_parts[0]); // add hour
+        dt_value = dt_value * 100 + Long.valueOf(time_parts[1]); // add minute
+        dt_value = dt_value * 100 + Long.valueOf(time_parts[2]); // add second
+        dt_value = dt_value * 100 + Long.valueOf(mirco_seconds); // add micro second
+        return dt_value;
+   }
+
+   static long encode_date(String date) {
+        String[] parts = date.split("-");
+        long date_value = 0;
+        date_value += Long.valueOf(parts[0]); // add year
+        date_value = date_value * 100 + Long.valueOf(parts[1]); // add month
+        date_value = date_value * 100 + Long.valueOf(parts[2]); // add day
+        return date_value;
+   }
+
    static void load_vertex(final JanusGraph graph) {
-	   get_vertex_files();
+       get_vertex_files();
         for(String file_name : _cur_files) {
      	    int count =0;
      	    JanusGraphTransaction tx = graph.newTransaction();
@@ -156,28 +189,47 @@ public class LdbcGraphFactory {
                 // Initialize vertex properties
                 String[] properties = line.split("\\|");
                 int length = properties.length;
-                for(int i=1; i<length; i++) {
-                	properties[i] = vertex_label+"."+properties[i];
+                int id_loc = length + 1;
+                for(int i=0; i<length; i++) {
+                    if(properties[i].equals("id")) {
+                        id_loc = i;
+                        break;
+                    }
                 }
+                if(id_loc > length) {
+                    System.out.println("Error in vertex proporties!");
+                    return;
+                }
+                // for(int i=1; i<length; i++) {
+                // 	properties[i] = vertex_label+"."+properties[i];
+                // }
                 
                 while ((line = br.readLine()) != null) {
                     String[] values = line.split("\\|");
-                    long id = Long.valueOf(values[0]);
+                    long id = Long.valueOf(values[id_loc]);
                     if(id_map.containsKey(id))
                     	System.out.println("Duplicate key: "+id);
                     id_map.put(id, _global_id++);
                     long janusVertexId = ((StandardJanusGraph) graph).getIDManager().toVertexId(id_map.get(id));
                     Vertex v = tx.addVertex(T.id, janusVertexId, T.label, vertex_label);
                     
-                    for(int i=1; i<properties.length; i++) {
+                    for(int i=0; (i < properties.length && i != id_loc); i++) {
                     	if(values[i].isEmpty())
-                    		continue;
+                            continue;
                     	String property = properties[i];
                     	if(propertyTypes.get(property).equals("String")) {
                     		v.property(property, values[i]);
                     	}
                     	else {
-                    		v.property(property, Long.valueOf(values[i]));
+                            if(properties[i].equals("creationDate") || properties[i].equals("joinDate")) {
+                                v.property(property, encode_datetime(values[i]));
+                            } 
+                            else if(properties[i].equals("birthday")) {
+                                v.property(property, encode_date(values[i]));
+                            }
+                            else {
+                                v.property(property, Long.valueOf(values[i]));
+                            }
                     	}
                     }
                     
@@ -221,21 +273,40 @@ public class LdbcGraphFactory {
                 // Initialize edge properties
                 String[] properties = line.split("\\|");
                 int length = properties.length;
-                for(int i=2; i<length; i++) {
-                	properties[i] = edge_label+"."+properties[i];
+                int src_id_loc = length + 1;
+                int dst_id_loc = length + 1;
+                for(int i=0; i<length; i++) {
+                    if(properties[i].equals(source_label + ".id")) {
+                        src_id_loc = i;
+                        break;
+                    }
                 }
+                for(int i=src_id_loc+1; i<length; i++) {
+                    if(properties[i].equals(dest_label + ".id")) {
+                        dst_id_loc = i;
+                        break;
+                    }
+                }
+                if(src_id_loc > length || dst_id_loc > length) {
+                    System.out.println("Error in vertex proporties!");
+                    return;
+                }
+
+                // for(int i=2; i<length; i++) {
+                // 	properties[i] = edge_label+"."+properties[i];
+                // }
                 
                 while ((line = br.readLine()) != null) {
                 	String[] values = line.split("\\|");
-                    long local_src = Long.valueOf(values[0]);
-                    long local_dest = Long.valueOf(values[1]);
+                    long local_src = Long.valueOf(values[src_id_loc]);
+                    long local_dest = Long.valueOf(values[dst_id_loc]);
                     long src_id = _label_ids_map.get(source_label).get(local_src);
                     long dest_id = _label_ids_map.get(dest_label).get(local_dest);
                     Vertex src = tx.getVertex(((StandardJanusGraph) graph).getIDManager().toVertexId(src_id));
                     Vertex dest = tx.getVertex(((StandardJanusGraph) graph).getIDManager().toVertexId(dest_id));
                     Edge edge = src.addEdge(edge_label, dest);
                     
-                    for(int i=2; i<properties.length; i++) {
+                    for(int i=0; (i<properties.length && i != src_id_loc && i != dst_id_loc); i++) {
                     	if(values[i].isEmpty())
                     		continue;
                     	String property = properties[i];
@@ -243,7 +314,12 @@ public class LdbcGraphFactory {
                     		edge.property(property, values[i]);
                     	}
                     	else {
-                    		edge.property(property, Long.valueOf(values[i]));
+                            if(properties[i].equals("creationDate") || properties[i].equals("joinDate")) {
+                                edge.property(property, encode_datetime(values[i]));
+                            } 
+                            else {
+                                edge.property(property, Long.valueOf(values[i]));
+                            }
                     	}
                     }
                     
@@ -265,6 +341,61 @@ public class LdbcGraphFactory {
 
         }
 
+    }
+
+    static void load_extra_properties(final JanusGraph graph) {
+        get_extra_property_files();
+        for(String file_name : _cur_files) {
+            int count =0;
+            JanusGraphTransaction tx = graph.newTransaction();
+
+            String prop_relation_name = file_name.split("/" + _folder_name + "/")[1].split("_0_0")[0];
+            String[] names = prop_relation_name.split("_");
+            String vertex_label = _name_map.get(names[0]);
+            String vertex_property = names[1];
+            String vertex_property_entity = names[2];
+            System.out.println("Loading extra vertex properties "+ vertex_label+" "+vertex_property+" "+vertex_property_entity);
+
+            try (BufferedReader br = new BufferedReader(new FileReader(file_name))) {
+                String line;
+                line = br.readLine();
+
+                // Initialize edge properties
+                String[] properties = line.split("\\|");
+                int length = properties.length;
+                
+                long last_vertex = -1;
+                String props = "";
+                while ((line = br.readLine()) != null) {
+                    String[] values = line.split("\\|");
+                    long vertex = Long.valueOf(values[1]);
+                    if(vertex != last_vertex) {
+                        if(last_vertex >= 0) {
+                            long dump_vertex = _label_ids_map.get(vertex_label).get(last_vertex);
+                            Vertex v = tx.getVertex(((StandardJanusGraph) graph).getIDManager().toVertexId(dump_vertex));
+                            v.property(vertex_property, props.substring(0, props.length()-1));
+                            props = "";
+                        }
+                        last_vertex = vertex;
+                    }
+                    props += (values[2] + " ");
+
+                    if(count++ == 1000) {
+                        tx.commit();
+                        count = 0;
+                        tx = graph.newTransaction();
+                    }
+                }
+                br.close();
+            }
+            catch(Exception e) {
+                System.out.println("error: "+e.getMessage());
+            }
+
+            if(count != 0) {
+                tx.commit();
+            }
+        }
     }
     
     static void load_property(final JanusGraph graph) {
@@ -310,15 +441,13 @@ public class LdbcGraphFactory {
  public static void load(final JanusGraph graph) {
 
      //Create Schema
-	 load_helper();
-	 get_edge_files();
-	 get_vertex_files();
+     load_helper();
+     load_property(graph);
 
      // Load graph
-	 load_property(graph);
      load_vertex(graph);
      load_edges(graph);
-
+     load_extra_properties(graph);
  }
 
  
