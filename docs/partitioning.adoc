@@ -1,5 +1,5 @@
 [[graph-partitioning]]
-== Graph Partitioning
+== Graph ing
 
 When JanusGraph is deployed on a cluster of multiple storage backend instances, the graph is partitioned across those machines. Since JanusGraph stores the graph in an adjacency list representation the assignment of vertices to machines determines the partitioning. By default, JanusGraph uses a random partitioning strategy that randomly assigns vertices to machines. Random partitioning is very efficient, requires no configuration, and results in balanced partitions. Currently explicit partitioning is not supported.
 

@@ -15,10 +15,10 @@ private static BufferedReader br;
 
 public static void main(String args[]) throws IOException {
 	String[] files = { 
-	    				"/Users/lisu/Local/janusgraph-0.5.0-SNAPSHOT-hadoop2/typeIDToPropertyName.csv",
-	    				"/Users/lisu/Local/janusgraph-0.5.0-SNAPSHOT-hadoop2/typeIDToPropertyNameRemaining.csv",
-	    				"/Users/lisu/Local/janusgraph-0.5.0-SNAPSHOT-hadoop2/typeIDToVertexLabel.csv",
-	    				"/Users/lisu/Local/janusgraph-0.5.0-SNAPSHOT-hadoop2/typeIDToEdgeLabel.csv",
+	    				"/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/typeIDToPropertyName.csv",
+	    				"/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/typeIDToPropertyNameRemaining.csv",
+	    				"/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/typeIDToVertexLabel.csv",
+						"/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/typeIDToEdgeLabel.csv",
 					};
 	HashMap<String, Integer> properties = new HashMap<>();
 	HashMap<String, Integer> labels = new HashMap<>();
@@ -70,7 +70,6 @@ public static void main(String args[]) throws IOException {
 		properties.put(values[1], Integer.valueOf(values[0]));
 		System.out.println("{"+values[0]+",\""+values[1]+"\"},");
 	}
-    
 }
 
 }

@@ -51,6 +51,9 @@ public class LdbcGraphFactory {
     //storage::graph_store* _graph;
     static long _global_id = 1;
 
+    static long _partition_num = 1;
+    static long _cur_partition = 0;
+
     class edge_id {
         long src_id;
         long inner_id;
@@ -174,10 +177,11 @@ public class LdbcGraphFactory {
    static void load_vertex(final JanusGraph graph) {
        get_vertex_files();
         for(String file_name : _cur_files) {
-     	    int count =0;
+            int loaded_num = 0;
+     	    int count = 0;
      	    JanusGraphTransaction tx = graph.newTransaction();
         	String vertex_label = _name_map.get(file_name.split("/" + _folder_name + "/")[1].split("_0_0")[0]);
-            System.out.println("Loading: "+ vertex_label + " id from " + _global_id);
+            System.out.print("Loading: "+ vertex_label + " id from " + _global_id);
         	HashMap<Long, Long> id_map;
         	if(!_label_ids_map.containsKey(vertex_label))
         		_label_ids_map.put(vertex_label, new HashMap<>());
@@ -210,17 +214,21 @@ public class LdbcGraphFactory {
                     if(id_map.containsKey(id))
                     	System.out.println("Duplicate key: "+id);
                     id_map.put(id, _global_id++);
+
+                    if(id_map.get(id) % _partition_num != _cur_partition) continue;
+
+                    loaded_num++;
                     long janusVertexId = ((StandardJanusGraph) graph).getIDManager().toVertexId(id_map.get(id));
                     Vertex v = tx.addVertex(T.id, janusVertexId, T.label, vertex_label);
                     
                     for(int i=0; (i < properties.length && i != id_loc); i++) {
-                    	if(values[i].isEmpty())
+                        if(values[i].isEmpty())
                             continue;
-                    	String property = properties[i];
-                    	if(propertyTypes.get(property).equals("String")) {
-                    		v.property(property, values[i]);
-                    	}
-                    	else {
+                        String property = properties[i];
+                        if(propertyTypes.get(property).equals("String")) {
+                            v.property(property, values[i]);
+                        }
+                        else {
                             if(properties[i].equals("creationDate") || properties[i].equals("joinDate")) {
                                 v.property(property, encode_datetime(values[i]));
                             } 
@@ -230,7 +238,7 @@ public class LdbcGraphFactory {
                             else {
                                 v.property(property, Long.valueOf(values[i]));
                             }
-                    	}
+                        }
                     }
                     
                     if(count++ == 1000) {
@@ -248,7 +256,8 @@ public class LdbcGraphFactory {
             if(count != 0) {
                 tx.commit();
             }
-            System.out.println("Loaded: "+ vertex_label + " id to " + _global_id);
+            System.out.println(" to " + _global_id);
+            System.out.println("---- actual number in this partition: " + loaded_num);
         }
 
     }
@@ -302,6 +311,9 @@ public class LdbcGraphFactory {
                     long local_dest = Long.valueOf(values[dst_id_loc]);
                     long src_id = _label_ids_map.get(source_label).get(local_src);
                     long dest_id = _label_ids_map.get(dest_label).get(local_dest);
+
+                    if((src_id % _partition_num != _cur_partition) || (dest_id % _partition_num != _cur_partition)) continue;
+
                     Vertex src = tx.getVertex(((StandardJanusGraph) graph).getIDManager().toVertexId(src_id));
                     Vertex dest = tx.getVertex(((StandardJanusGraph) graph).getIDManager().toVertexId(dest_id));
                     Edge edge = src.addEdge(edge_label, dest);
@@ -372,8 +384,10 @@ public class LdbcGraphFactory {
                     if(vertex != last_vertex) {
                         if(last_vertex >= 0) {
                             long dump_vertex = _label_ids_map.get(vertex_label).get(last_vertex);
-                            Vertex v = tx.getVertex(((StandardJanusGraph) graph).getIDManager().toVertexId(dump_vertex));
-                            v.property(vertex_property, props.substring(0, props.length()-1));
+                            if(dump_vertex % _partition_num == _cur_partition) {
+                                Vertex v = tx.getVertex(((StandardJanusGraph) graph).getIDManager().toVertexId(dump_vertex));
+                                v.property(vertex_property, props.substring(0, props.length()-1));
+                            }
                             props = "";
                         }
                         last_vertex = vertex;
@@ -438,7 +452,14 @@ public class LdbcGraphFactory {
      return indexName == null || graph.getIndexSerializer().containsIndex(indexName);
  }
 
+ public static void configure_partition(long partition_number, long current_partition) {
+     _partition_num = partition_number;
+     _cur_partition = current_partition;
+ }
+
  public static void load(final JanusGraph graph) {
+    //  _partition_num = partition_number;
+    //  _cur_partition = current_partition;
 
      //Create Schema
      load_helper();
