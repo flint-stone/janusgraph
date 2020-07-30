@@ -27,11 +27,8 @@ import org.janusgraph.core.schema.JanusGraphIndex;
 import org.janusgraph.core.schema.JanusGraphManagement;
 import org.janusgraph.graphdb.database.StandardJanusGraph;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.io.*;
+import java.util.*;
 
 import org.apache.tinkerpop.gremlin.structure.Edge;
 import org.apache.tinkerpop.gremlin.structure.T;
@@ -221,7 +218,8 @@ public class LdbcGraphFactory {
                     long janusVertexId = ((StandardJanusGraph) graph).getIDManager().toVertexId(id_map.get(id));
                     Vertex v = tx.addVertex(T.id, janusVertexId, T.label, vertex_label);
                     
-                    for(int i=0; (i < properties.length && i != id_loc); i++) {
+                    for(int i=0; i < properties.length; i++) {
+                        if(i == id_loc) continue;
                         if(values[i].isEmpty())
                             continue;
                         String property = properties[i];
@@ -318,8 +316,9 @@ public class LdbcGraphFactory {
                     Vertex dest = tx.getVertex(((StandardJanusGraph) graph).getIDManager().toVertexId(dest_id));
                     Edge edge = src.addEdge(edge_label, dest);
                     
-                    for(int i=0; (i<properties.length && i != src_id_loc && i != dst_id_loc); i++) {
-                    	if(values[i].isEmpty())
+                    for(int i=0; i<properties.length; i++) {
+                        if(i == src_id_loc || i == dst_id_loc) continue;
+                        if(values[i].isEmpty())
                     		continue;
                     	String property = properties[i];
                     	if(propertyTypes.get(property).equals("String")) {
@@ -419,8 +418,9 @@ public class LdbcGraphFactory {
             line = br.readLine();
 			while(line != null) {
 				String name = line.split(" ")[0];
-				String type = line.split(" ")[1];
-				propertyTypes.put(name, type);
+                String type = line.split(" ")[1];
+                System.out.println("Loading property: " + name + "(" + type + ")");
+                propertyTypes.put(name, type);
 				if(type.equals("String")) {
 					management.makePropertyKey(name).dataType(String.class).make();
 				}
@@ -457,6 +457,110 @@ public class LdbcGraphFactory {
      _cur_partition = current_partition;
  }
 
+ public static void dedupe_schema_files() {
+    String[] files = { 
+        "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/typeIDToPropertyName.csv",
+        "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/typeIDToPropertyNameRemaining.csv",
+        "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/typeIDToVertexLabel.csv",
+        "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/typeIDToEdgeLabel.csv",
+    };
+    HashMap<String, Integer> properties_to_id = new HashMap<>();
+    HashMap<String, Integer> properties_to_type = new HashMap<>();
+	HashMap<String, Integer> labels = new HashMap<>();
+	// HashSet<String> contents = new HashSet<>();
+    
+    
+	for(int i=0; i<2; i++) {
+        try (BufferedReader br = new BufferedReader(new FileReader(files[i]))) {
+            String line = br.readLine();
+            while(line != null) {
+                if(!line.contains("$")) {
+                    String[] values = line.split(",");
+                    properties_to_id.put(values[1], Integer.valueOf(values[0]));
+                    properties_to_type.put(values[1], Integer.valueOf(values[2]));
+                }
+                line = br.readLine();
+            }
+            br.close();
+        }
+        catch(Exception e) {
+            System.out.println("error: "+e.getMessage());
+        }
+    }
+    
+    try (BufferedWriter bw = new BufferedWriter(new FileWriter(files[0]))) {
+        Iterator<HashMap.Entry<String, Integer>> entries = properties_to_id.entrySet().iterator();
+        while (entries.hasNext()) {
+            HashMap.Entry<String, Integer> entry = entries.next();
+            bw.write(entry.getValue() + "," + entry.getKey() + "," + properties_to_type.get(entry.getKey()));
+            if(entries.hasNext()) {
+                bw.newLine();
+            }
+        }
+        bw.flush();
+        bw.close();
+    }
+    catch(Exception e) {
+        System.out.println("error: "+e.getMessage());
+    }
+	// System.out.println(contents.size());
+	// for(String s : contents) {
+	// 	String[] values = s.split(",");
+	// 	properties.put(values[1], Integer.valueOf(values[0]));
+	// 	System.out.println("{\""+values[1]+"\","+values[0]+"},");
+	// }
+	
+	for(int i=2; i<4; i++) {
+        labels.clear();
+
+        try (BufferedReader br = new BufferedReader(new FileReader(files[i]))) {
+            String line = br.readLine();
+            while(line != null) {
+                if(!(line.contains("v[") || line.contains("$") )) {
+                    String[] values = line.split(",");
+                    labels.put(values[1], Integer.valueOf(values[0]));
+                }
+                line = br.readLine();
+            }
+            br.close();
+        }
+        catch(Exception e) {
+            System.out.println("error: "+e.getMessage());
+        }
+
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(files[i]))) {
+            Iterator<HashMap.Entry<String, Integer>> entries = labels.entrySet().iterator();
+            while (entries.hasNext()) {
+                HashMap.Entry<String, Integer> entry = entries.next();
+                bw.write(entry.getValue() + "," + entry.getKey());
+                if(entries.hasNext()) {
+                    bw.newLine();
+                }
+            }
+            bw.flush();
+            bw.close();
+        }
+        catch(Exception e) {
+            System.out.println("error: "+e.getMessage());
+        }
+	}
+    
+
+	// System.out.println(contents.size());
+	// for(String s : contents) {
+	// 	String[] values = s.split(",");
+	// 	properties.put(values[1], Integer.valueOf(values[0]));
+	// 	System.out.println("{\""+values[1]+"\","+values[0]+"},");
+	// }
+    
+	// System.out.println(contents.size());
+	// for(String s : contents) {
+	// 	String[] values = s.split(",");
+	// 	properties.put(values[1], Integer.valueOf(values[0]));
+	// 	System.out.println("{"+values[0]+",\""+values[1]+"\"},");
+	// }
+ }
+
  public static void load(final JanusGraph graph) {
     //  _partition_num = partition_number;
     //  _cur_partition = current_partition;
@@ -469,6 +573,7 @@ public class LdbcGraphFactory {
      load_vertex(graph);
      load_edges(graph);
      load_extra_properties(graph);
+     dedupe_schema_files();
  }
 
  
