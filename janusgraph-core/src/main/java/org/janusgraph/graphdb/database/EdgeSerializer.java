@@ -350,7 +350,7 @@ public class EdgeSerializer implements RelationReader {
                 sb.append(typeId + ",");
                 sb.append(type.isEdgeLabel() + ",");
                 sb.append(multiplicity.isConstrained() + ",");
-                sb.append(multiplicity.isUnique(dir));
+                sb.append(multiplicity.isUnique(dir) + ",");
                 sb.append(type.isInvisibleType());
                 pws[0].println(sb.toString());
                 pws[0].flush();
@@ -445,7 +445,7 @@ public class EdgeSerializer implements RelationReader {
 
             assert key.dataType().isInstance(value);
 
-//            if(!set4.containsKey(typeId)){
+            if(!set4.containsKey(typeId)){
                 logger.debug("EdgeSerializer property: otherVertexId label {} name {} relationName {} typeId {} relationId {} registrationNo {}", key.label(), key.name(), value, typeId, relationId, serializer.getDataTypeRegistration(key.dataType()));
                 StringBuilder sb = new StringBuilder();
                 sb.append(typeId + ",");
@@ -456,7 +456,7 @@ public class EdgeSerializer implements RelationReader {
                 pws[3].println(sb.toString());
                 pws[3].flush();
                 set4.put(typeId, key.name());
-//            }
+            }
 
             if (multiplicity.isConstrained()) {
                 if (multiplicity.isUnique(dir)) { //Cardinality=SINGLE
