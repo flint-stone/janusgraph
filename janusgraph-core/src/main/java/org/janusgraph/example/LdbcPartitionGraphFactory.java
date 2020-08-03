@@ -45,7 +45,7 @@ public class LdbcPartitionGraphFactory {
     static ArrayList<String> vertexLabels = new ArrayList<>();
     static HashSet<String> edgeLabels = new HashSet<>();
     static HashSet<Long> vertices_at_other_partitions = new HashSet<>();
-    static HashMap<String, String>propertyTypes = new HashMap<>();
+    static HashMap<String, String> propertyTypes = new HashMap<>();
     
     //storage::graph_store* _graph;
     static long _global_id = 1;
@@ -253,7 +253,7 @@ public class LdbcPartitionGraphFactory {
                 br.close();
             }
             catch(Exception e) {
-                System.out.println("error: "+e.getMessage());
+                System.out.println("error in load_vertex: "+e.getMessage());
             }
             for(int i = 0; i < _partition_num; i++) {
                 if(counts[i] != 0) {
@@ -392,7 +392,7 @@ public class LdbcPartitionGraphFactory {
                 br.close();
             }
             catch(Exception e) {
-                System.out.println("error: "+e.getMessage());
+                System.out.println("error in load_edges: "+e.getMessage());
             }
 
             for(int i = 0; i < _partition_num; i++) {
@@ -454,7 +454,7 @@ public class LdbcPartitionGraphFactory {
                 br.close();
             }
             catch(Exception e) {
-                System.out.println("error: "+e.getMessage());
+                System.out.println("error in load_extra_properties: "+e.getMessage());
             }
             for(int i = 0; i < _partition_num; i++) {
                 if(counts[i] != 0) {
@@ -473,7 +473,7 @@ public class LdbcPartitionGraphFactory {
                 while(line != null) {
                     String name = line.split(" ")[0];
                     String type = line.split(" ")[1];
-                    System.out.println("Loading property: " + name + "(" + type + ")");
+                    // System.out.println("Loading property: " + name + "(" + type + ")");
                     propertyTypes.put(name, type);
                     if(type.equals("String")) {
                         management.makePropertyKey(name).dataType(String.class).make();
@@ -508,11 +508,18 @@ public class LdbcPartitionGraphFactory {
     }
 
     public static void dedupe_schema_files() {
-        String[] files = { 
-            "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/typeIDToPropertyName.csv",
-            "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/typeIDToPropertyNameRemaining.csv",
-            "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/typeIDToVertexLabel.csv",
-            "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/typeIDToEdgeLabel.csv",
+
+        String[] in_files = { 
+            "typeIDToPropertyName.csv",
+            "typeIDToPropertyNameRemaining.csv",
+            "typeIDToVertexLabel.csv",
+            "typeIDToEdgeLabel.csv",
+        };
+        String[] out_files = {
+            "db/bdbje-partitions/typeIDToPropertyName.csv",
+            "db/bdbje-partitions/typeIDToPropertyNameRemaining.csv",
+            "db/bdbje-partitions/typeIDToVertexLabel.csv",
+            "db/bdbje-partitions/typeIDToEdgeLabel.csv",
         };
         HashMap<String, Integer> properties_to_id = new HashMap<>();
         HashMap<String, Integer> properties_to_type = new HashMap<>();
@@ -524,11 +531,11 @@ public class LdbcPartitionGraphFactory {
             properties_to_id.clear();
             properties_to_type.clear();
             
-            try (BufferedReader br = new BufferedReader(new FileReader(files[i]))) {
+            try (BufferedReader br = new BufferedReader(new FileReader(in_files[i]))) {
                 String line = br.readLine();
                 while(line != null) {
-                    if(!line.contains("$")) {
-                        String[] values = line.split(",");
+                    String[] values = line.split(",");
+                    if(propertyTypes.containsKey(values[1])) {
                         properties_to_id.put(values[1], Integer.valueOf(values[0]));
                         properties_to_type.put(values[1], Integer.valueOf(values[2]));
                     }
@@ -537,10 +544,10 @@ public class LdbcPartitionGraphFactory {
                 br.close();
             }
             catch(Exception e) {
-                System.out.println("error: "+e.getMessage());
+                System.out.println("error in dedupe_schema_files(PropertyName Read): "+e.getMessage());
             }
 
-            try (BufferedWriter bw = new BufferedWriter(new FileWriter(files[i]))) {
+            try (BufferedWriter bw = new BufferedWriter(new FileWriter(out_files[i]))) {
                 Iterator<HashMap.Entry<String, Integer>> entries = properties_to_id.entrySet().iterator();
                 while (entries.hasNext()) {
                     HashMap.Entry<String, Integer> entry = entries.next();
@@ -553,7 +560,7 @@ public class LdbcPartitionGraphFactory {
                 bw.close();
             }
             catch(Exception e) {
-                System.out.println("error: "+e.getMessage());
+                System.out.println("error in dedupe_schema_files(PropertyName Write): "+e.getMessage());
             }
         }
 
@@ -568,22 +575,24 @@ public class LdbcPartitionGraphFactory {
         for(int i=2; i<4; i++) {
             labels.clear();
 
-            try (BufferedReader br = new BufferedReader(new FileReader(files[i]))) {
+            try (BufferedReader br = new BufferedReader(new FileReader(in_files[i]))) {
                 String line = br.readLine();
                 while(line != null) {
-                    if(!(line.contains("v[") || line.contains("$") )) {
-                        String[] values = line.split(",");
+                    String[] values = line.split(",");
+                    if(vertexLabels.contains(values[1]) || edgeLabels.contains(values[1])) {
                         labels.put(values[1], Integer.valueOf(values[0]));
+                        // System.out.println("label: "+values[1]+", id: "+values[0]);
                     }
+                    if(i == 2 && labels.size() == vertexLabels.size()) break;
                     line = br.readLine();
                 }
                 br.close();
             }
             catch(Exception e) {
-                System.out.println("error: "+e.getMessage());
+                System.out.println("error in dedupe_schema_files(Vertex/Edge label read): "+e.getMessage());
             }
 
-            try (BufferedWriter bw = new BufferedWriter(new FileWriter(files[i]))) {
+            try (BufferedWriter bw = new BufferedWriter(new FileWriter(out_files[i]))) {
                 Iterator<HashMap.Entry<String, Integer>> entries = labels.entrySet().iterator();
                 while (entries.hasNext()) {
                     HashMap.Entry<String, Integer> entry = entries.next();
@@ -596,7 +605,7 @@ public class LdbcPartitionGraphFactory {
                 bw.close();
             }
             catch(Exception e) {
-                System.out.println("error: "+e.getMessage());
+                System.out.println("error in dedupe_schema_files(Vertex/Edge label write): "+e.getMessage());
             }
         }
 
