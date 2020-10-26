@@ -34,7 +34,7 @@ import org.apache.tinkerpop.gremlin.structure.Edge;
 import org.apache.tinkerpop.gremlin.structure.T;
 import org.apache.tinkerpop.gremlin.structure.Vertex;
 
-public class LdbcGraphFactory {
+public class LdbcTestGraphFactory {
 	static HashMap<String, HashMap<Long, Long>>  _label_ids_map = new HashMap<String, HashMap<Long, Long>>();
     static HashMap<String, String> _name_map = new HashMap<>();
     static ArrayList<String> _cur_files = new ArrayList<String>();
@@ -216,7 +216,7 @@ public class LdbcGraphFactory {
                     if(id_map.get(id) % _partition_num != _cur_partition) continue;
 
                     loaded_num++;
-                    long janusVertexId = ((StandardJanusGraph) graph).getIDManager().toVertexId(id_map.get(id));
+                    long janusVertexId = id_map.get(id) << 8;
                     // if(vertex_label.equals("Person")) {
                     //     System.out.println("ID in janusgraph: "+janusVertexId+", Global ID: "+id_map.get(id)+", LDBC ID: "+id);
                     // }
@@ -313,8 +313,8 @@ public class LdbcGraphFactory {
                     long local_dest = Long.valueOf(values[dst_id_loc]);
                     long global_src = _label_ids_map.get(source_label).get(local_src);
                     long global_dest = _label_ids_map.get(dest_label).get(local_dest);
-                    long janus_src_id = ((StandardJanusGraph) graph).getIDManager().toVertexId(global_src);
-                    long janus_dest_id = ((StandardJanusGraph) graph).getIDManager().toVertexId(global_dest);
+                    long janus_src_id = global_src << 8;
+                    long janus_dest_id = global_dest << 8;
                     Vertex src;
                     Vertex dest;
                     if((global_src % _partition_num != _cur_partition) && (global_dest % _partition_num != _cur_partition)) {
@@ -404,7 +404,7 @@ public class LdbcGraphFactory {
                         if(last_vertex >= 0) {
                             long dump_vertex = _label_ids_map.get(vertex_label).get(last_vertex);
                             if(dump_vertex % _partition_num == _cur_partition) {
-                                Vertex v = tx.getVertex(((StandardJanusGraph) graph).getIDManager().toVertexId(dump_vertex));
+                                Vertex v = tx.getVertex(dump_vertex << 8);
                                 v.property(vertex_property, props.substring(0, props.length()-1));
                             }
                             props = "";
@@ -479,10 +479,10 @@ public class LdbcGraphFactory {
 
  public static void dedupe_schema_files() {
     String[] files = { 
-        "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/0_typeIDToPropertyName.csv",
-        "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/0_typeIDToPropertyNameRemaining.csv",
-        "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/0_typeIDToVertexLabel.csv",
-        "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/0_typeIDToEdgeLabel.csv",
+        "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/typeIDToPropertyName.csv",
+        "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/typeIDToPropertyNameRemaining.csv",
+        "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/typeIDToVertexLabel.csv",
+        "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/typeIDToEdgeLabel.csv",
     };
     HashMap<String, Integer> properties_to_id = new HashMap<>();
     HashMap<String, Integer> properties_to_type = new HashMap<>();

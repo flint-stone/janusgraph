@@ -78,6 +78,8 @@ public class EdgeSerializer implements RelationReader {
 
     private PrintWriter pws[];
 
+    static int partition_id = 0;
+
     public EdgeSerializer(Serializer serializer) {
         this.serializer = serializer;
         set1 = new HashSet<>();
@@ -87,19 +89,20 @@ public class EdgeSerializer implements RelationReader {
         set5 = new HashMap<>();
         set6 = new HashMap<>();
 
+
 //        PrintWriter pw = new PrintWriter(new FileOutputStream(
 //            new File("persons.txt"),
 //            true /* append = true */));
         try{
             pws = new PrintWriter[]{
-                new PrintWriter(new FileOutputStream(new File("typeIDRelation.csv")), true), // Write EdgeSerializer writeRelation
-                new PrintWriter(new FileOutputStream(new File("typeIDToEdgeLabel.csv")), true), // EdgeSerializer edge: otherVertexId
-                new PrintWriter(new FileOutputStream(new File("typeIDToProperties.csv")), true), // Write EdgeSerializer parseRelation:
-                new PrintWriter(new FileOutputStream(new File("typeIDToPropertyName.csv")), true), // EdgeSerializer property: otherVertexId
-                new PrintWriter(new FileOutputStream(new File("typeIDToPropertyNameRemaining.csv")), true), // EdgeSerializer remaining: writeInline
-                new PrintWriter(new FileOutputStream(new File("typeIDToVertexLabel.csv")), true) // EdgeSerializer remaining: writeInline
+                new PrintWriter(new FileOutputStream(new File(Integer.toString(partition_id) + "_typeIDRelation.csv")), true), // Write EdgeSerializer writeRelation
+                new PrintWriter(new FileOutputStream(new File(Integer.toString(partition_id) + "_typeIDToEdgeLabel.csv")), true), // EdgeSerializer edge: otherVertexId
+                new PrintWriter(new FileOutputStream(new File(Integer.toString(partition_id) + "_typeIDToProperties.csv")), true), // Write EdgeSerializer parseRelation:
+                new PrintWriter(new FileOutputStream(new File(Integer.toString(partition_id) + "_typeIDToPropertyName.csv")), true), // EdgeSerializer property: otherVertexId
+                new PrintWriter(new FileOutputStream(new File(Integer.toString(partition_id) + "_typeIDToPropertyNameRemaining.csv")), true), // EdgeSerializer remaining: writeInline
+                new PrintWriter(new FileOutputStream(new File(Integer.toString(partition_id) + "_typeIDToVertexLabel.csv")), true) // EdgeSerializer remaining: writeInline
             };
-
+            partition_id++;
         }
         catch(Exception e){
             for (PrintWriter pw : pws){
