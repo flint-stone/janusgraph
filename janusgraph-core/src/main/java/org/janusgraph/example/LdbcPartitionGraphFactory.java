@@ -635,8 +635,6 @@ public class LdbcPartitionGraphFactory {
                 int shadow_v_num = 0;
                 while ((line = br.readLine()) != null) {
                     loaders[line_readed++ % _thread_num].add_line(line);
-                    // if(line_readed % 10000 == 0)
-                    //     System.out.println("        Line read number with loading shadow vertices : " + line_readed);
 
                     String[] values = line.split("\\|");
                     long local_src = Long.valueOf(values[src_id_loc]);
@@ -839,10 +837,10 @@ public class LdbcPartitionGraphFactory {
             Integer.toString(p_id) + "_typeIDToEdgeLabel.csv",
         };
         String[] out_files = {
-            "db/bdbje-partitions/typeIDToPropertyName.csv",
-            "db/bdbje-partitions/typeIDToPropertyNameRemaining.csv",
-            "db/bdbje-partitions/typeIDToVertexLabel.csv",
-            "db/bdbje-partitions/typeIDToEdgeLabel.csv",
+            "db/bdbje-partitions/schema_of_ptn_s" + _partition_num + "/typeIDToPropertyName.csv",
+            "db/bdbje-partitions/schema_of_ptn_s" + _partition_num + "/typeIDToPropertyNameRemaining.csv",
+            "db/bdbje-partitions/schema_of_ptn_s" + _partition_num + "/typeIDToVertexLabel.csv",
+            "db/bdbje-partitions/schema_of_ptn_s" + _partition_num + "/typeIDToEdgeLabel.csv",
         };
         HashMap<String, Integer> properties_to_id = new HashMap<>();
         HashMap<String, Integer> properties_to_type = new HashMap<>();
