@@ -36,7 +36,7 @@ import org.apache.tinkerpop.gremlin.structure.Edge;
 import org.apache.tinkerpop.gremlin.structure.T;
 import org.apache.tinkerpop.gremlin.structure.Vertex;
 
-public class LdbcPartitionGraphFactory {
+public class OptLdbcPartitionGraphFactory {
     static ArrayList<JanusGraph> _graphs = new ArrayList<JanusGraph>();
 	static HashMap<String, HashMap<Long, Long>>  _label_ids_map = new HashMap<String, HashMap<Long, Long>>();
     static HashMap<String, String> _name_map = new HashMap<>();
@@ -57,18 +57,6 @@ public class LdbcPartitionGraphFactory {
     static int _tx_batch_size = 40000;
     // static int _tx_total_vertex_cache_size = 2000000;
 
-    class edge_id {
-        long src_id;
-        long inner_id;
-        long dst_id;
-
-		public edge_id(long src_id, long inner_id, long dst_id) {
-			this.src_id = src_id;
-			this.inner_id = inner_id;
-			this.dst_id = dst_id;
-		}
-
-    }
     static void load_helper() {
         _name_map.put("comment", "Comment");
         _name_map.put("forum", "Forum");
@@ -115,21 +103,22 @@ public class LdbcPartitionGraphFactory {
         _cur_files.add(_prefix_path + "comment_isLocatedIn_place_0_0.csv");
         _cur_files.add(_prefix_path + "comment_replyOf_comment_0_0.csv");
         _cur_files.add(_prefix_path + "comment_replyOf_post_0_0.csv");
+
         _cur_files.add(_prefix_path + "forum_containerOf_post_0_0.csv");
         _cur_files.add(_prefix_path + "forum_hasMember_person_0_0.csv");
         _cur_files.add(_prefix_path + "forum_hasModerator_person_0_0.csv");
         _cur_files.add(_prefix_path + "forum_hasTag_tag_0_0.csv");
+
         _cur_files.add(_prefix_path + "organisation_isLocatedIn_place_0_0.csv");
-        //_cur_files.add(_prefix_path + "person_email_emailaddress_0_0.csv");
         _cur_files.add(_prefix_path + "person_hasInterest_tag_0_0.csv");
         _cur_files.add(_prefix_path + "person_isLocatedIn_place_0_0.csv");
         _cur_files.add(_prefix_path + "person_knows_person_0_0.csv");
         _cur_files.add(_prefix_path + "person_likes_comment_0_0.csv");
         _cur_files.add(_prefix_path + "person_likes_post_0_0.csv");
-        //_cur_files.add(_prefix_path + "person_speaks_language_0_0.csv");
         _cur_files.add(_prefix_path + "person_studyAt_organisation_0_0.csv");
         _cur_files.add(_prefix_path + "person_workAt_organisation_0_0.csv");
         _cur_files.add(_prefix_path + "place_isPartOf_place_0_0.csv");
+
         _cur_files.add(_prefix_path + "post_hasCreator_person_0_0.csv");
         _cur_files.add(_prefix_path + "post_hasTag_tag_0_0.csv");
         _cur_files.add(_prefix_path + "post_isLocatedIn_place_0_0.csv");
@@ -224,9 +213,9 @@ public class LdbcPartitionGraphFactory {
 
                 tbuilder = _graphs.get(i).buildTransaction();
                 tbuilder.vertexCacheSize(Math.min(_tx_batch_size, ptn_counts[i]));
-                tbuilder.checkInternalVertexExistence(false);
-                tbuilder.checkExternalVertexExistence(false);
-                tbuilder.consistencyChecks(false);
+                // tbuilder.checkInternalVertexExistence(false);
+                // tbuilder.checkExternalVertexExistence(false);
+                // tbuilder.consistencyChecks(false);
                 txs[i] = tbuilder.start();
             }
 
@@ -279,9 +268,9 @@ public class LdbcPartitionGraphFactory {
 
                     tbuilder = _graphs.get(partition_id).buildTransaction();
                     tbuilder.vertexCacheSize(_tx_batch_size);
-                    tbuilder.checkInternalVertexExistence(false);
-                    tbuilder.checkExternalVertexExistence(false);
-                    tbuilder.consistencyChecks(false);
+                    // tbuilder.checkInternalVertexExistence(false);
+                    // tbuilder.checkExternalVertexExistence(false);
+                    // tbuilder.consistencyChecks(false);
                     txs[partition_id] = tbuilder.start();
                 }
 
@@ -461,9 +450,9 @@ public class LdbcPartitionGraphFactory {
 
                 tbuilder = _graphs.get(i).buildTransaction();
                 tbuilder.vertexCacheSize(Math.min(_tx_batch_size, ptn_counts[i]));
-                tbuilder.checkInternalVertexExistence(false);
-                tbuilder.checkExternalVertexExistence(false);
-                tbuilder.consistencyChecks(false);
+                // tbuilder.checkInternalVertexExistence(false);
+                // tbuilder.checkExternalVertexExistence(false);
+                // tbuilder.consistencyChecks(false);
                 txs[i] = tbuilder.start();
             }
 
@@ -484,9 +473,9 @@ public class LdbcPartitionGraphFactory {
 
                     tbuilder = _graphs.get(partition_id).buildTransaction();
                     tbuilder.vertexCacheSize(_tx_batch_size);
-                    tbuilder.checkInternalVertexExistence(false);
-                    tbuilder.checkExternalVertexExistence(false);
-                    tbuilder.consistencyChecks(false);
+                    // tbuilder.checkInternalVertexExistence(false);
+                    // tbuilder.checkExternalVertexExistence(false);
+                    // tbuilder.consistencyChecks(false);
                     txs[partition_id] = tbuilder.start();
                 }
             }
@@ -578,9 +567,9 @@ public class LdbcPartitionGraphFactory {
 
                 tbuilder = _graphs.get(i).buildTransaction();
                 tbuilder.vertexCacheSize(_tx_batch_size);
-                tbuilder.checkInternalVertexExistence(false);
-                tbuilder.checkExternalVertexExistence(false);
-                tbuilder.consistencyChecks(false);
+                // tbuilder.checkInternalVertexExistence(false);
+                // tbuilder.checkExternalVertexExistence(false);
+                // tbuilder.consistencyChecks(false);
                 txs[i] = tbuilder.start();
             }
 
@@ -672,9 +661,9 @@ public class LdbcPartitionGraphFactory {
 
                     tbuilder = _graphs.get(src_partition_id).buildTransaction();
                     tbuilder.vertexCacheSize(_tx_batch_size);
-                    tbuilder.checkInternalVertexExistence(false);
-                    tbuilder.checkExternalVertexExistence(false);
-                    tbuilder.consistencyChecks(false);
+                    // tbuilder.checkInternalVertexExistence(false);
+                    // tbuilder.checkExternalVertexExistence(false);
+                    // tbuilder.consistencyChecks(false);
                     txs[src_partition_id] = tbuilder.start();
                 }
                 if(counts[dest_partition_id] >= _tx_batch_size) {
@@ -684,9 +673,9 @@ public class LdbcPartitionGraphFactory {
 
                     tbuilder = _graphs.get(dest_partition_id).buildTransaction();
                     tbuilder.vertexCacheSize(_tx_batch_size);
-                    tbuilder.checkInternalVertexExistence(false);
-                    tbuilder.checkExternalVertexExistence(false);
-                    tbuilder.consistencyChecks(false);
+                    // tbuilder.checkInternalVertexExistence(false);
+                    // tbuilder.checkExternalVertexExistence(false);
+                    // tbuilder.consistencyChecks(false);
                     txs[dest_partition_id] = tbuilder.start();
                 }
 
@@ -886,6 +875,7 @@ public class LdbcPartitionGraphFactory {
             for(int i = 0; i < _thread_num; i++) {
                 loaders[i] = null;
             }
+
             System.gc();
             System.runFinalization();
         }
@@ -901,10 +891,17 @@ public class LdbcPartitionGraphFactory {
         get_extra_property_files();
         int[] counts = new int[(int)_partition_num];
         JanusGraphTransaction[] txs = new JanusGraphTransaction[(int)_partition_num];
+        TransactionBuilder tbuilder;
         for(String file_name : _cur_files) {
             for(int i = 0; i < _partition_num; i++) {
                 counts[i] = 0;
-                txs[i] = _graphs.get(i).newTransaction();
+
+                tbuilder = _graphs.get(i).buildTransaction();
+                tbuilder.vertexCacheSize(_tx_batch_size);
+                // tbuilder.checkInternalVertexExistence(false);
+                // tbuilder.checkExternalVertexExistence(false);
+                // tbuilder.consistencyChecks(false);
+                txs[i] = tbuilder.start();
             }
 
             String prop_relation_name = file_name.split("/" + _folder_name + "/")[1].split("_0_0")[0];
@@ -934,10 +931,16 @@ public class LdbcPartitionGraphFactory {
                             Vertex v = txs[partition_id].getVertex(((StandardJanusGraph) _graphs.get(partition_id)).getIDManager().toVertexId(dump_vertex));
                             v.property(vertex_property, props.substring(0, props.length()-1));
                             props = "";
-                            if(counts[partition_id]++ >= 100000) {
+                            if(counts[partition_id]++ >= _tx_batch_size) {
                                 txs[partition_id].commit();
                                 counts[partition_id] = 0;
-                                txs[partition_id] = _graphs.get(partition_id).newTransaction();
+
+                                tbuilder = _graphs.get(partition_id).buildTransaction();
+                                tbuilder.vertexCacheSize(_tx_batch_size);
+                                // tbuilder.checkInternalVertexExistence(false);
+                                // tbuilder.checkExternalVertexExistence(false);
+                                // tbuilder.consistencyChecks(false);
+                                txs[partition_id] = tbuilder.start();
                             }
                         }
                         last_vertex = vertex;
@@ -957,7 +960,71 @@ public class LdbcPartitionGraphFactory {
         }
     }
 
-    static void load_labels() {
+    static void dump_label_map() {
+        String[] all_labels = { 
+            "Comment",
+            "Forum",
+            "Organisation",
+            "Person",
+            "Place",
+            "Post",
+            "Tag",
+            "TagClass",
+        };
+
+        for(int i = 0; i < 8; i++) {
+            String dump_file_path = "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/db/bdbje-partitions/" + _folder_name + "/label_map/" + all_labels[i];
+
+            try (BufferedWriter bw = new BufferedWriter(new FileWriter(dump_file_path))) {
+                Iterator<HashMap.Entry<Long, Long>> entries = _label_ids_map.get(all_labels[i]).entrySet().iterator();
+                while (entries.hasNext()) {
+                    HashMap.Entry<Long, Long> entry = entries.next();
+                    bw.write(entry.getKey() + " " + entry.getValue());
+                    if(entries.hasNext()) {
+                        bw.newLine();
+                    }
+                }
+                bw.flush();
+                bw.close();
+            }
+            catch(Exception e) {
+                System.out.println("error in dump_label_map: "+e.getMessage());
+            }
+        }
+    }
+
+    static void load_label_map() {
+        String[] all_labels = { 
+            "Comment",
+            "Forum",
+            "Organisation",
+            "Person",
+            "Place",
+            "Post",
+            "Tag",
+            "TagClass",
+        };
+
+        for(int i = 0; i < 8; i++) {
+            String load_file_path = "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/db/bdbje-partitions/" + _folder_name + "/label_map/" + all_labels[i];
+            
+            HashMap<Long, Long> id_map = _label_ids_map.get(all_labels[i]);
+            id_map.clear();
+            try (BufferedReader br = new BufferedReader(new FileReader(load_file_path))) {
+                String line;
+                while((line = br.readLine()) != null) {
+                    String[] values = line.split(" ");
+                    id_map.put(Long.valueOf(values[0]), Long.valueOf(values[1]));
+                }
+                br.close();
+            }
+            catch(Exception e) {
+                System.out.println("error in load_label_map: "+e.getMessage());
+            }
+        }
+    }
+
+    static void make_label_schema() {
         ArrayList<String> _vertex_labels = new ArrayList<String>();
         _vertex_labels.add("Comment");
         _vertex_labels.add("Organisation");
@@ -997,29 +1064,37 @@ public class LdbcPartitionGraphFactory {
         }
     }
     
-    static void load_property() {
+    static void load_property_types() {
+        try (BufferedReader br = new BufferedReader(new FileReader(_poperty_file_path))) {
+            String line;
+            line = br.readLine();
+            while(line != null) {
+                String name = line.split(" ")[0];
+                String type = line.split(" ")[1];
+                propertyTypes.put(name, type);
+                line = br.readLine();
+            }
+            br.close();
+        }
+        catch(Exception e) {
+            System.out.println("error: "+e.getMessage());
+        }
+    }
+
+    static void make_property_schema() {
         for(JanusGraph g: _graphs) {
             JanusGraphManagement management = g.openManagement();
-            try (BufferedReader br = new BufferedReader(new FileReader(_poperty_file_path))) {
-                String line;
-                line = br.readLine();
-                while(line != null) {
-                    String name = line.split(" ")[0];
-                    String type = line.split(" ")[1];
-                    // System.out.println("Loading property: " + name + "(" + type + ")");
-                    propertyTypes.put(name, type);
-                    if(type.equals("String")) {
-                        management.makePropertyKey(name).dataType(String.class).make();
-                    }
-                    else {
-                        management.makePropertyKey(name).dataType(Long.class).make();
-                    }
-                    line = br.readLine();
+            Iterator<HashMap.Entry<String, String>> entries = propertyTypes.entrySet().iterator();
+            while (entries.hasNext()) {
+                HashMap.Entry<String, String> entry = entries.next();
+                String name = entry.getKey();
+                String type = entry.getValue();
+                if(type.equals("String")) {
+                    management.makePropertyKey(name).dataType(String.class).make();
                 }
-                br.close();
-            }
-            catch(Exception e) {
-                System.out.println("error: "+e.getMessage());
+                else {
+                    management.makePropertyKey(name).dataType(Long.class).make();
+                }
             }
             management.commit();
         }
@@ -1040,19 +1115,17 @@ public class LdbcPartitionGraphFactory {
         return indexName == null || graph.getIndexSerializer().containsIndex(indexName);
     }
 
-    public static void dedupe_schema_files(int p_id) {
+    public static void dedupe_vertex_schema_files(int p_id) {
 
         String[] in_files = { 
             Integer.toString(p_id) + "_typeIDToPropertyName.csv",
-            Integer.toString(p_id) + "_typeIDToPropertyNameRemaining.csv",
+            // Integer.toString(p_id) + "_typeIDToPropertyNameRemaining.csv",
             Integer.toString(p_id) + "_typeIDToVertexLabel.csv",
-            Integer.toString(p_id) + "_typeIDToEdgeLabel.csv",
+            // Integer.toString(p_id) + "_typeIDToEdgeLabel.csv",
         };
         String[] out_files = {
-            "db/bdbje-partitions/schema_of_ptn_s" + _partition_num + "/typeIDToPropertyName.csv",
-            "db/bdbje-partitions/schema_of_ptn_s" + _partition_num + "/typeIDToPropertyNameRemaining.csv",
-            "db/bdbje-partitions/schema_of_ptn_s" + _partition_num + "/typeIDToVertexLabel.csv",
-            "db/bdbje-partitions/schema_of_ptn_s" + _partition_num + "/typeIDToEdgeLabel.csv",
+            "db/bdbje-partitions/typeIDToPropertyName.csv",
+            "db/bdbje-partitions/typeIDToVertexLabel.csv",
         };
         HashMap<String, Integer> properties_to_id = new HashMap<>();
         HashMap<String, Integer> properties_to_type = new HashMap<>();
@@ -1060,7 +1133,7 @@ public class LdbcPartitionGraphFactory {
         // HashSet<String> contents = new HashSet<>();
 
 
-        for(int i=0; i<2; i++) {
+        for(int i=0; i<1; i++) {
             properties_to_id.clear();
             properties_to_type.clear();
             
@@ -1097,15 +1170,7 @@ public class LdbcPartitionGraphFactory {
             }
         }
 
-
-        // System.out.println(contents.size());
-        // for(String s : contents) {
-        // 	String[] values = s.split(",");
-        // 	properties.put(values[1], Integer.valueOf(values[0]));
-        // 	System.out.println("{\""+values[1]+"\","+values[0]+"},");
-        // }
-
-        for(int i=2; i<4; i++) {
+        for(int i=1; i<2; i++) {
             labels.clear();
 
             try (BufferedReader br = new BufferedReader(new FileReader(in_files[i]))) {
@@ -1141,21 +1206,97 @@ public class LdbcPartitionGraphFactory {
                 System.out.println("error in dedupe_schema_files(Vertex/Edge label write): "+e.getMessage());
             }
         }
+    }
+
+    public static void dedupe_edge_schema_files(int p_id) {
+
+        String[] in_files = {
+            Integer.toString(p_id) + "_typeIDToPropertyNameRemaining.csv",
+            Integer.toString(p_id) + "_typeIDToEdgeLabel.csv",
+        };
+        String[] out_files = {
+            "db/bdbje-partitions/typeIDToPropertyNameRemaining.csv",
+            "db/bdbje-partitions/typeIDToEdgeLabel.csv",
+        };
+        HashMap<String, Integer> properties_to_id = new HashMap<>();
+        HashMap<String, Integer> properties_to_type = new HashMap<>();
+        HashMap<String, Integer> labels = new HashMap<>();
+        // HashSet<String> contents = new HashSet<>();
 
 
-        // System.out.println(contents.size());
-        // for(String s : contents) {
-        // 	String[] values = s.split(",");
-        // 	properties.put(values[1], Integer.valueOf(values[0]));
-        // 	System.out.println("{\""+values[1]+"\","+values[0]+"},");
-        // }
+        for(int i=0; i<1; i++) {
+            properties_to_id.clear();
+            properties_to_type.clear();
+            
+            try (BufferedReader br = new BufferedReader(new FileReader(in_files[i]))) {
+                String line = br.readLine();
+                while(line != null) {
+                    String[] values = line.split(",");
+                    if(propertyTypes.containsKey(values[1])) {
+                        properties_to_id.put(values[1], Integer.valueOf(values[0]));
+                        properties_to_type.put(values[1], Integer.valueOf(values[2]));
+                    }
+                    line = br.readLine();
+                }
+                br.close();
+            }
+            catch(Exception e) {
+                System.out.println("error in dedupe_schema_files(PropertyName Read): "+e.getMessage());
+            }
 
-        // System.out.println(contents.size());
-        // for(String s : contents) {
-        // 	String[] values = s.split(",");
-        // 	properties.put(values[1], Integer.valueOf(values[0]));
-        // 	System.out.println("{"+values[0]+",\""+values[1]+"\"},");
-        // }
+            try (BufferedWriter bw = new BufferedWriter(new FileWriter(out_files[i]))) {
+                Iterator<HashMap.Entry<String, Integer>> entries = properties_to_id.entrySet().iterator();
+                while (entries.hasNext()) {
+                    HashMap.Entry<String, Integer> entry = entries.next();
+                    bw.write(entry.getValue() + "," + entry.getKey() + "," + properties_to_type.get(entry.getKey()));
+                    if(entries.hasNext()) {
+                        bw.newLine();
+                    }
+                }
+                bw.flush();
+                bw.close();
+            }
+            catch(Exception e) {
+                System.out.println("error in dedupe_schema_files(PropertyName Write): "+e.getMessage());
+            }
+        }
+
+        for(int i=1; i<2; i++) {
+            labels.clear();
+
+            try (BufferedReader br = new BufferedReader(new FileReader(in_files[i]))) {
+                String line = br.readLine();
+                while(line != null) {
+                    String[] values = line.split(",");
+                    if(vertexLabels.contains(values[1]) || edgeLabels.contains(values[1])) {
+                        labels.put(values[1], Integer.valueOf(values[0]));
+                        // System.out.println("label: "+values[1]+", id: "+values[0]);
+                    }
+                    if(i == 2 && labels.size() == vertexLabels.size()) break;
+                    line = br.readLine();
+                }
+                br.close();
+            }
+            catch(Exception e) {
+                System.out.println("error in dedupe_schema_files(Vertex/Edge label read): "+e.getMessage());
+            }
+
+            try (BufferedWriter bw = new BufferedWriter(new FileWriter(out_files[i]))) {
+                Iterator<HashMap.Entry<String, Integer>> entries = labels.entrySet().iterator();
+                while (entries.hasNext()) {
+                    HashMap.Entry<String, Integer> entry = entries.next();
+                    bw.write(entry.getValue() + "," + entry.getKey());
+                    if(entries.hasNext()) {
+                        bw.newLine();
+                    }
+                }
+                bw.flush();
+                bw.close();
+            }
+            catch(Exception e) {
+                System.out.println("error in dedupe_schema_files(Vertex/Edge label write): "+e.getMessage());
+            }
+        }
     }
 
     public static void load(final JanusGraph graph) {
@@ -1173,26 +1314,55 @@ public class LdbcPartitionGraphFactory {
         //  dedupe_schema_files();
     }
 
-    public static void load_partitions(String folder_name, int partition_number) {
+    public static void load_graph_vertices(String folder_name, int partition_number) {
         // Init graphs
         _partition_num = partition_number;
         _folder_name = folder_name;
         _prefix_path = "/home/houbai/codelab/documents/data/" + _folder_name + "/";
         load_helper();
+        get_vertex_files();
+        get_edge_files();
+
         for(int i = 0; i < _partition_num; i++) {
             _graphs.add(i, JanusGraphFactory.open("conf/berkeleyje-partition/janusgraph-berkeleyje-p" + i + ".properties"));
         }
-        load_labels();
-        load_property();
+        make_label_schema();
+        load_property_types();
+        make_property_schema();
 
-        // Load graph
+        // Load vertex
         load_vertex();
-        load_edges();
         load_extra_properties();
+        dump_label_map();
+
         for(int i = 0; i < _partition_num; i++) {
             _graphs.get(i).close();
         }
-        dedupe_schema_files(0);
+        // dedupe_vertex_schema_files(0);
+    }
+
+    public static void load_graph_edges(String folder_name, int partition_number) {
+        // Init graphs
+        _partition_num = partition_number;
+        _folder_name = folder_name;
+        _prefix_path = "/home/houbai/codelab/documents/data/" + _folder_name + "/";
+        load_helper();
+        get_vertex_files();
+        get_edge_files();
+
+        for(int i = 0; i < _partition_num; i++) {
+            _graphs.add(i, JanusGraphFactory.open("conf/berkeleyje-partition/janusgraph-berkeleyje-p" + i + ".properties"));
+        }
+        load_property_types();
+
+        // Load edges
+        load_label_map();
+        load_edges();
+
+        for(int i = 0; i < _partition_num; i++) {
+            _graphs.get(i).close();
+        }
+        // dedupe_edge_schema_files(0);
     }
 
  
