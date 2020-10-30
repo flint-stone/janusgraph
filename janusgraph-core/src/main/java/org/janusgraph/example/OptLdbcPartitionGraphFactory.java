@@ -54,7 +54,7 @@ public class OptLdbcPartitionGraphFactory {
     static long _global_id = 1;
     static int _partition_num = 1;
     static int _thread_num = 32;
-    static int _tx_batch_size = 40000;
+    static int _tx_batch_size = 80000;
     // static int _tx_total_vertex_cache_size = 2000000;
 
     static void load_helper() {
@@ -100,15 +100,16 @@ public class OptLdbcPartitionGraphFactory {
     	_cur_files.clear();
         _cur_files.add(_prefix_path + "comment_hasCreator_person_0_0.csv");
         _cur_files.add(_prefix_path + "comment_hasTag_tag_0_0.csv");
+
         _cur_files.add(_prefix_path + "comment_isLocatedIn_place_0_0.csv");
         _cur_files.add(_prefix_path + "comment_replyOf_comment_0_0.csv");
         _cur_files.add(_prefix_path + "comment_replyOf_post_0_0.csv");
-
         _cur_files.add(_prefix_path + "forum_containerOf_post_0_0.csv");
+
         _cur_files.add(_prefix_path + "forum_hasMember_person_0_0.csv");
+
         _cur_files.add(_prefix_path + "forum_hasModerator_person_0_0.csv");
         _cur_files.add(_prefix_path + "forum_hasTag_tag_0_0.csv");
-
         _cur_files.add(_prefix_path + "organisation_isLocatedIn_place_0_0.csv");
         _cur_files.add(_prefix_path + "person_hasInterest_tag_0_0.csv");
         _cur_files.add(_prefix_path + "person_isLocatedIn_place_0_0.csv");
@@ -132,6 +133,43 @@ public class OptLdbcPartitionGraphFactory {
             	String edge_label = names[1];
             	edgeLabels.add(edge_label);
             }
+        }
+    }
+
+    static void get_edge_batch_files(int batch_id) {
+        _cur_files.clear();
+        if(batch_id == 0) {
+            _cur_files.add(_prefix_path + "comment_hasCreator_person_0_0.csv");
+            _cur_files.add(_prefix_path + "comment_hasTag_tag_0_0.csv");
+        }
+        else if(batch_id == 1) {
+            _cur_files.add(_prefix_path + "comment_isLocatedIn_place_0_0.csv");
+            _cur_files.add(_prefix_path + "comment_replyOf_comment_0_0.csv");
+            _cur_files.add(_prefix_path + "comment_replyOf_post_0_0.csv");
+            _cur_files.add(_prefix_path + "forum_containerOf_post_0_0.csv");
+        }
+        else if(batch_id == 2) {
+            _cur_files.add(_prefix_path + "forum_hasMember_person_0_0.csv");
+        }
+        else if(batch_id == 3) {
+            _cur_files.add(_prefix_path + "forum_hasModerator_person_0_0.csv");
+            _cur_files.add(_prefix_path + "forum_hasTag_tag_0_0.csv");
+            _cur_files.add(_prefix_path + "organisation_isLocatedIn_place_0_0.csv");
+            _cur_files.add(_prefix_path + "person_hasInterest_tag_0_0.csv");
+            _cur_files.add(_prefix_path + "person_isLocatedIn_place_0_0.csv");
+            _cur_files.add(_prefix_path + "person_knows_person_0_0.csv");
+            _cur_files.add(_prefix_path + "person_likes_comment_0_0.csv");
+            _cur_files.add(_prefix_path + "person_likes_post_0_0.csv");
+            _cur_files.add(_prefix_path + "person_studyAt_organisation_0_0.csv");
+            _cur_files.add(_prefix_path + "person_workAt_organisation_0_0.csv");
+            _cur_files.add(_prefix_path + "place_isPartOf_place_0_0.csv");
+        }
+        else if(batch_id == 4) {
+            _cur_files.add(_prefix_path + "post_hasCreator_person_0_0.csv");
+            _cur_files.add(_prefix_path + "post_hasTag_tag_0_0.csv");
+            _cur_files.add(_prefix_path + "post_isLocatedIn_place_0_0.csv");
+            _cur_files.add(_prefix_path + "tag_hasType_tagclass_0_0.csv");
+            _cur_files.add(_prefix_path + "tagclass_isSubclassOf_tagclass_0_0.csv");
         }
     }
 
@@ -232,7 +270,7 @@ public class OptLdbcPartitionGraphFactory {
             Vertex v = null;
             String property;
             for(int idx = 0; idx < lines.size(); idx++) {
-                if(++read_count % 20000 == 0) {
+                if(++read_count % 40000 == 0) {
                     System.out.println("        [Thread " + t_id + "] processed number : " + read_count);
                 }
 
@@ -460,7 +498,7 @@ public class OptLdbcPartitionGraphFactory {
             int partition_id;
             shadow_insert_unit insert_unit;
             for(int idx = 0; idx < lines.size(); idx++) {
-                if(++read_count % 20000 == 0)
+                if(++read_count % 40000 == 0)
                     System.out.println("        [Thread " + t_id + "] Loading shadow vertices, processed number : " + read_count);
                 insert_unit = lines.get(idx);
                 partition_id = insert_unit.p_id;
@@ -593,7 +631,7 @@ public class OptLdbcPartitionGraphFactory {
             Edge e1 = null;
             Edge e2 = null;
             for(int idx = 0; idx < lines.size(); idx++) {
-                if(++read_count % 20000 == 0)
+                if(++read_count % 40000 == 0)
                     System.out.println("        [Thread " + t_id + "] Loading edges, processed number : " + read_count);
 
                 values = lines.get(idx).split("\\|");
@@ -729,8 +767,9 @@ public class OptLdbcPartitionGraphFactory {
         }
     }
 
-    static void load_edges() {
-        get_edge_files();
+    static void load_edges(int batch_id) {
+        get_edge_batch_files(batch_id);
+
         EdgeLoadThread[] loaders = new EdgeLoadThread[_thread_num];
         ShadowVtxLoadThread[] shadow_loaders = new ShadowVtxLoadThread[_thread_num];
         // JanusGraphTransaction[] txs = new JanusGraphTransaction[(int)_partition_num];
@@ -1341,7 +1380,7 @@ public class OptLdbcPartitionGraphFactory {
         // dedupe_vertex_schema_files(0);
     }
 
-    public static void load_graph_edges(String folder_name, int partition_number) {
+    public static void load_graph_edges(String folder_name, int partition_number, int batch_id) {
         // Init graphs
         _partition_num = partition_number;
         _folder_name = folder_name;
@@ -1357,7 +1396,7 @@ public class OptLdbcPartitionGraphFactory {
 
         // Load edges
         load_label_map();
-        load_edges();
+        load_edges(batch_id);
 
         for(int i = 0; i < _partition_num; i++) {
             _graphs.get(i).close();
