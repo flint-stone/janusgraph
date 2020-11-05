@@ -31,6 +31,11 @@ import org.janusgraph.graphdb.database.StandardJanusGraph;
 import java.io.*;
 import java.util.*;
 import java.lang.*;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import org.apache.tinkerpop.gremlin.structure.Edge;
 import org.apache.tinkerpop.gremlin.structure.T;
@@ -153,19 +158,16 @@ public class LdbcPartitionGraphFactory {
     }
 
    static long encode_datetime(String datetime) {
-        String[] parts = datetime.split("T");
-        long dt_value = 0; 
-        String[] date_parts = parts[0].split("-");
-        dt_value += Long.valueOf(date_parts[0]); // add year
-        dt_value = dt_value * 100 + Long.valueOf(date_parts[1]); // add month
-        dt_value = dt_value * 100 + Long.valueOf(date_parts[2]); // add day
-        String[] time_parts = parts[1].split("\\+")[0].split("\\.")[0].split(":");
-        String mirco_seconds = parts[1].split("\\+")[0].split("\\.")[1];
-        dt_value = dt_value * 100 + Long.valueOf(time_parts[0]); // add hour
-        dt_value = dt_value * 100 + Long.valueOf(time_parts[1]); // add minute
-        dt_value = dt_value * 100 + Long.valueOf(time_parts[2]); // add second
-        dt_value = dt_value * 1000 + Long.valueOf(mirco_seconds); // add micro second
-        return dt_value;
+        long epochTime = 0; 
+        SimpleDateFormat crunchifyFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS+00:00");
+        try {
+            Date date = crunchifyFormat.parse(datetime);
+            epochTime = date.getTime();
+        }
+        catch (ParseException e) {
+			e.printStackTrace();
+		}
+        return epochTime;
    }
 
     static long encode_date(String date) {
@@ -175,6 +177,176 @@ public class LdbcPartitionGraphFactory {
         date_value = date_value * 100 + Long.valueOf(parts[1]); // add month
         date_value = date_value * 100 + Long.valueOf(parts[2]); // add day
         return date_value;
+    }
+
+    static int _benchmark_query_num = 10;
+
+    static ArrayList<String> get_gremlin_query_format() {
+        ArrayList<String> formats = new ArrayList<String>();
+        formats.add("");
+        // q1
+        formats.add("g.V(%1$s).repeat(__.out('knows').simplePath()).times(3).emit().dedup()."
+                  + "has('firstName',eq('%2$s')).order().by(__.path().count(local)).by('lastName').by('id')."
+                  + "project('PersonId', 'PersonLastName', 'DistanceFromPerson').by('id').by('lastName').by(__.path().count(local)).limit(20)");
+        // q2
+        formats.add("g.V(%1$s).out('knows').in('hasCreator').hasLabel('Post').has('creationDate',lte(%2$s)).order().by('creationDate', decr).by('id').limit(20)");
+        // q3
+        formats.add("g.V(%1$s).repeat(__.out('knows')).times(2).emit().dedup()."
+                  + "filter(__.out('isLocatedIn').out('isPartOf').has('name', without('%4$s', '%5$s')))." 
+                  + "filter(__.in('hasCreator').out('isLocatedIn').values('name').filter{it.get().contains('%4$s')}.filter{it.get().contains('%5$s')}).as('friends')."
+                  + "project('PersonId', 'xCount', 'yCount').by(select('friends'))."
+                  + "by(select('friends').in('hasCreator').has('creationDate',inside(%2$s, %3$s)).filter(out('isLocatedIn').has('name', '%4$s')).count())."
+                  + "by(select('friends').in('hasCreator').has('creationDate',inside(%2$s, %3$s)).filter(out('isLocatedIn').has('name', '%5$s')).count())."
+                  + "order().by(select('xCount'), decr).by(select('PersonId')).limit(20)");
+        // q4
+        formats.add("g.V(%1$s).out('knows').store('friends').barrier().in('hasCreator')."
+                  + "hasLabel('Post').has('creationDate',inside(%2$s, %3$s))."
+                  + "out('hasTag').filter(__.in('hasTag').hasLabel('Post').has('creationDate', lt(%2$s))."
+                  + "filter(out('hasCreator').where(within('friends'))).count().is(0)).group().by().by(count()).unfold()."
+                  + "order().by(select(values), decr).by(select(keys).values('name'))."
+                  + "project('TagName', 'TagCount').by(select(keys).values('name')).by(select(values)).limit(10)");
+        // q5
+        formats.add("g.V(%1$s).out('knows').union(identity(), out('knows')).dedup().store('friend').barrier()."
+                  + "inE('hasMember').has('creationDate', gt(%2$s)).outV().as('forum').dedup()."
+                  + "group().by().by(out('containerOf').out('hasCreator').where(within('friend')).count()).unfold()."
+                  + "order().by(select(values), decr).by(select(keys)).limit(20)");
+        // q6
+        formats.add("g.V(%1$s).repeat(__.out('knows')).times(2).emit().dedup().in('hasCreator').hasLabel('Post')."
+                  + "filter(out('hasTag').values('name').filter{it.get().contains('%2$s')})."
+                  + "out('hasTag').has('name', without('%2$s')).group().by().by(count()).unfold()."
+                  + "order().by(select(values), decr).by(select(keys).values('name')).limit(10)");
+        // q7
+        formats.add("g.V(%1$s).inE('hasCreator').as('create_msg').outV().as('messages')."
+                  + "inE('likes').as('begin_like').outV().as('liker')."
+                  + "order().by(select('begin_like').values('creationDate'), decr).by(select('liker'))."
+                  + "project('LikePerson', 'LikeDate', 'MsgContent', 'LikeLatency', 'IsFriendFlag')."
+                  + "by(select('liker')).by(select('begin_like').values('creationDate'))."
+                  + "by(select('messages').values('content')).by(math('begin_like - create_msg')."
+                  + "by('creationDate')).by(select('liker').in('knows').hasId(%1$s).count()).limit(20)");
+        // q8
+        formats.add("g.V(%1$s).in('hasCreator').in('replyOf').hasLabel('Comment').as('comment')."
+                  + "out('hasCreator').as('commenter').order().by(select('comment').values('creationDate'), decr)."
+                  + "by(select('comment')).select('commenter','comment').limit(20)");
+        // q9
+        formats.add("g.V(%1$s).repeat(__.out('knows')).times(2).emit().dedup().as('creators').in('hasCreator')."
+                  + "has('creationDate',lt(%2$s)).as('messages')."
+                  + "order().by(select('messages').values('creationDate'), decr).by(select('messages'))."
+                  + "project('MessageId', 'CreationDate', 'Creator', 'ContentOrImageFile').by(select('messages'))."
+                  + "by(select('messages').values('creationDate')).by(select('messages').out('hasCreator'))."
+                  + "by(select('messages').values('content', 'imageFile')).limit(20)");
+        // q10
+        formats.add("g.V(%1$s).out('knows').out('knows').dedup().filter(__.project('b_day', 'b_month')."
+                  + "by(math('_ - floor(_ / 100) * 100').by('birthday')).by(math('floor(_ / 100) - floor(_ / 10000) * 100')."
+                  + "by('birthday')).or(and(select('b_month').is(eq(%2$s)), select('b_day').is(gte(21))), and(select('b_month').is(eq((%2$s + 1) %% 12)), select('b_day').is(lt(22)))))."
+                  + "as('person').project('person_id', 'sum', 'common').by(select('person')).by(select('person')."
+                  + "in('hasCreator').count()).by(select('person').in('hasCreator').where(out('hasTag')."
+                  + "in('hasInterest').hasLabel('Person').hasId(%1$s)).count()).project('PersonId', 'CommonScore')."
+                  + "by(select('person')).by(math('2 * common - sum')).order().by(select('CommonScore'), decr)."
+                  + "by(select('PersonId')).limit(10)");
+        // q11
+        formats.add("g.V(%1$s).repeat(__.out('knows')).emit().times(2).dedup().as('friends')."
+                  + "outE('workAt').has('workFrom', lt(%3$s)).as('startWork').inV()."
+                  + "filter(out('isLocatedIn').has('name',eq('%2$s'))).as('organ')."
+                  + "order().by(select('startWork').values('workFrom')).by(select('friends')).by(select('organ').values('name'), decr)."
+                  + "select('friends', 'startWork', 'organ').by().by('workFrom').by('name').limit(10)");
+        // q12
+        formats.add("g.V(%1$s).out('knows').as('friends').in('hasCreator').hasLabel('Comment').as('replies')."
+                  + "out('replyOf').hasLabel('Post').out('hasTag').filter(out('hasType').union(identity(), out('isSubclassOf'))."
+                  + "values('name').filter{it.get().contains('%2$s')}).as('tags')."
+                  + "group().by(select('friends')).by(group().by(select('replies')).by(select('tags')).unfold()."
+                  + "union(select(keys).count(), select(values).dedup().values('name')).fold()).unfold()."
+                  + "order().by(select(values).unfold().limit(1), decr).by(select(keys)).limit(20)");
+        
+        return formats;
+    }
+
+    static void convert_query_params() {
+        ArrayList<String> gremlin_formats = get_gremlin_query_format();
+        SimpleDateFormat crunchifyFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS+00:00");
+        String input_path_folder = _prefix_path + "substitution_parameters/";
+        String output_path_folder = "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/db/bdbje-partitions/" + _folder_name + "/queries/";
+        String line;
+        int read_num;
+        for(int i = 1; i <= 12; i++) {
+            String input_param_list_file = input_path_folder + "interactive_" + i + "_param.txt";
+            String brane_output_file = output_path_folder + "brane_interactive_" + i + "_param.txt";
+            String janusgraph_output_file = output_path_folder + "janusgraph_interactive_" + i + "_query.txt";
+            String neo4j_output_file = output_path_folder + "neo4j_interactive_" + i + "_param.txt";
+            try {
+                BufferedReader br = new BufferedReader(new FileReader(input_param_list_file));
+                BufferedWriter bw_brane = new BufferedWriter(new FileWriter(brane_output_file));
+                BufferedWriter bw_janus = new BufferedWriter(new FileWriter(janusgraph_output_file));
+                BufferedWriter bw_neo4j = new BufferedWriter(new FileWriter(neo4j_output_file));
+
+                line = br.readLine();
+                String[] param_names = line.split("\\|");
+                int len = param_names.length;
+                for(int x = 0; x < len; x++) {
+                    if(param_names[x].equals("durationDays")) {
+                        param_names[x] = "endDate";
+                    }
+                    bw_brane.write(param_names[x]);
+                    bw_janus.write(param_names[x]);
+                    bw_neo4j.write(param_names[x]);
+                    if(x < len -1) {
+                        bw_brane.write(" ");
+                        bw_janus.write(" ");
+                        bw_neo4j.write(" ");
+                    }
+                }
+
+                read_num = 0;
+                while ((line = br.readLine()) != null) {
+                    String[] values = line.split("\\|");
+                    for(int x = 0; x < len; x++) {
+                        if(param_names[x].equals("endDate")) {
+                            long epoch_count = Long.valueOf(values[x-1]) + 24 * 60 * 60 * 1000 * Long.valueOf(values[x]);
+                            values[x] = String.valueOf(epoch_count);
+                        }
+                    }
+
+                    bw_neo4j.newLine();
+                    for(int x = 0; x < len; x++) {
+                        String param_x = values[x];
+                        if(param_names[x].endsWith("Date")) {
+                            Date param_date = new Date(Long.valueOf(param_x));
+                            param_x = crunchifyFormat.format(param_date);
+                        }
+                        bw_neo4j.write(param_x);
+                        if(x < len -1) {
+                            bw_neo4j.write(" ");
+                        }
+                    }
+
+                    bw_brane.newLine();
+                    values[0] = String.valueOf(_label_ids_map.get("Person").get(Long.valueOf(values[0])));
+                    for(int x = 0; x < len; x++) {
+                        bw_brane.write(values[x]);
+                        if(x < len -1) {
+                            bw_brane.write(" ");
+                        }
+                    }
+
+                    bw_janus.newLine();
+                    values[0] = String.valueOf(Long.valueOf(values[0]) * 256);
+                    bw_janus.write(String.format(gremlin_formats.get(i), values));
+
+                    if(++read_num == _benchmark_query_num) break;
+                }
+
+                br.close();
+                bw_brane.flush();
+                bw_brane.close();
+                bw_janus.flush();
+                bw_janus.close();
+                bw_neo4j.flush();
+                bw_neo4j.close();
+            }
+            catch(Exception e) {
+                System.out.println("error in convert_query_params: " + e.getMessage());
+            }
+
+        }
     }
 
     static class VtxLoadThread implements Runnable {
@@ -1097,14 +1269,6 @@ public class LdbcPartitionGraphFactory {
             }
         }
 
-
-        // System.out.println(contents.size());
-        // for(String s : contents) {
-        // 	String[] values = s.split(",");
-        // 	properties.put(values[1], Integer.valueOf(values[0]));
-        // 	System.out.println("{\""+values[1]+"\","+values[0]+"},");
-        // }
-
         for(int i=2; i<4; i++) {
             labels.clear();
 
@@ -1141,36 +1305,9 @@ public class LdbcPartitionGraphFactory {
                 System.out.println("error in dedupe_schema_files(Vertex/Edge label write): "+e.getMessage());
             }
         }
-
-
-        // System.out.println(contents.size());
-        // for(String s : contents) {
-        // 	String[] values = s.split(",");
-        // 	properties.put(values[1], Integer.valueOf(values[0]));
-        // 	System.out.println("{\""+values[1]+"\","+values[0]+"},");
-        // }
-
-        // System.out.println(contents.size());
-        // for(String s : contents) {
-        // 	String[] values = s.split(",");
-        // 	properties.put(values[1], Integer.valueOf(values[0]));
-        // 	System.out.println("{"+values[0]+",\""+values[1]+"\"},");
-        // }
     }
 
     public static void load(final JanusGraph graph) {
-        // //  _partition_num = partition_number;
-        // //  _cur_partition = current_partition;
-
-        //  //Create Schema
-        //  load_helper();
-        //  load_property(graph);
-
-        //  // Load graph
-        //  load_vertex(graph);
-        //  load_edges(graph);
-        //  load_extra_properties(graph);
-        //  dedupe_schema_files();
     }
 
     public static void load_partitions(String folder_name, int partition_number) {
@@ -1187,8 +1324,9 @@ public class LdbcPartitionGraphFactory {
 
         // Load graph
         load_vertex();
+        convert_query_params();
+        // load_extra_properties();
         load_edges();
-        load_extra_properties();
         for(int i = 0; i < _partition_num; i++) {
             _graphs.get(i).close();
         }
