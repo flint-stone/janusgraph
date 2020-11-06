@@ -53,7 +53,7 @@ public class OptmLdbcPartitionGraphFactory {
     static HashSet<String> edgeLabels = new HashSet<>();
     static HashSet<Long> vertices_at_other_partitions = new HashSet<>();
     static HashMap<String, String> propertyTypes = new HashMap<>();
-    static HashSet<Long>[] shadow_vertices_at_partitions;
+    // static HashSet<Long>[] shadow_vertices_at_partitions;
     
     //storage::graph_store* _graph;
     static long _global_id = 1;
@@ -709,118 +709,43 @@ public class OptmLdbcPartitionGraphFactory {
         }
     }
 
-    static void load_shadow_vertices() {
-        get_edge_files();
+    static void load_shadow_vertices(int batch_id) {
+        System.out.println("Loading shadow vertices of bacth " + batch_id);
+        String file_path = "/home/houbai/codelab/documents/data/" + _folder_name + "/shadow_insert_files/" 
+                      + _partition_num + "/shadow_batch_" + batch_id;
+
+        // Create thread loaders
         ShadowVtxLoadThread[] shadow_loaders = new ShadowVtxLoadThread[_thread_num];
-
-        Init shadow vertex sets
-        shadow_vertices_at_partitions = (HashSet<Long>[]) new HashSet[(int)_partition_num];
-        for(int i = 0; i < _partition_num; i++) {
-            shadow_vertices_at_partitions[i] = new HashSet<Long>();
+        for(int i = 0; i < _thread_num; i++) {
+            shadow_loaders[i] = new ShadowVtxLoadThread(i);
         }
 
-        for(String file_name : _cur_files) {
-            // Create thread loaders
-            for(int i = 0; i < _thread_num; i++) {
-                shadow_loaders[i] = new ShadowVtxLoadThread(i);
+        try (BufferedReader br = new BufferedReader(new FileReader(file_path))) {
+            String line;
+            int line_readed = 0;
+            while ((line = br.readLine()) != null) {
+                String[] values = line.split(" ");
+                int partition_id = Integer.valueOf(values[0]);
+                long janus_shadow_id_in_other_partition = ((StandardJanusGraph) _graphs.get(partition_id)).getIDManager().toVertexId(Long.valueOf(values[1]));
+                shadow_loaders[line_readed++ % _thread_num].add_insert_unit(
+                    partition_id, janus_shadow_id_in_other_partition, values[2]);
+
+                if(line_readed % 1000000 == 0)
+                    System.out.println("        CSV records read number : " + line_readed);  
             }
-
-            // Parse labels
-            String relation_name = file_name.split("/" + _folder_name + "/")[1].split("_0_0")[0];
-            String[] names = relation_name.split("_");
-            String source_label = _name_map.get(names[0]);
-            String edge_label = names[1];
-            String dest_label = _name_map.get(names[2]);
-            System.out.println("Loading shadow vertices in "+ source_label+"_"+edge_label+"_"+dest_label);
-
-            // Read files
-            try (BufferedReader br = new BufferedReader(new FileReader(file_name))) {
-                // Read header line
-                String line = br.readLine();
-                String[] properties = line.split("\\|");
-                int length = properties.length;
-                int src_id_loc = length + 1;
-                int dst_id_loc = length + 1;
-                for(int i=0; i<length; i++) {
-                    if(properties[i].equals(source_label + ".id")) {
-                        src_id_loc = i;
-                        break;
-                    }
-                }
-                for(int i=src_id_loc+1; i<length; i++) {
-                    if(properties[i].equals(dest_label + ".id")) {
-                        dst_id_loc = i;
-                        break;
-                    }
-                }
-                if(src_id_loc > length || dst_id_loc > length) {
-                    System.out.println("Error in vertex proporties!");
-                    return;
-                }
-
-                // Store lines in file
-                int line_readed = 0;
-                int shadow_v_num = 0;
-                while ((line = br.readLine()) != null) {
-                    String[] values = line.split("\\|");
-                    long global_src = get_global_id(source_label, Long.valueOf(values[src_id_loc]));
-                    long global_dest = get_global_id(dest_label, Long.valueOf(values[dst_id_loc]));
-                    int src_partition_id = (int) (global_src % _partition_num);
-                    int dest_partition_id = (int) (global_dest % _partition_num);
-
-                    if(src_partition_id != dest_partition_id) {
-                        long janus_shadow_src_id_in_dest_partition = ((StandardJanusGraph) _graphs.get(dest_partition_id)).getIDManager().toVertexId(global_src);
-                        long janus_shadow_dest_id_in_src_partition = ((StandardJanusGraph) _graphs.get(src_partition_id)).getIDManager().toVertexId(global_dest);
-                        if(!shadow_vertices_at_partitions[src_partition_id].contains(global_dest)) {
-                            shadow_loaders[shadow_v_num++ % _thread_num].add_insert_unit(src_partition_id, janus_shadow_dest_id_in_src_partition, dest_label);
-                            shadow_vertices_at_partitions[src_partition_id].add(global_dest);
-                        }
-                        if(!shadow_vertices_at_partitions[dest_partition_id].contains(global_src)) {
-                            shadow_loaders[shadow_v_num++ % _thread_num].add_insert_unit(dest_partition_id, janus_shadow_src_id_in_dest_partition, source_label);
-                            shadow_vertices_at_partitions[dest_partition_id].add(global_src);
-                        }
-                    }
-
-                    if(++line_readed % 1000000 == 0)
-                        System.out.println("        CSV records read number : " + line_readed);
-
-                    if(shadow_v_num > 0 && shadow_v_num % 60000000 == 0) {
-                        for(int i = 0; i < _thread_num; i++) {
-                            shadow_loaders[i].start();
-                        }
-                        for(int i = 0; i < _thread_num; i++) {
-                            shadow_loaders[i].join();
-                        }
-                        for(int i = 0; i < _thread_num; i++) {
-                            shadow_loaders[i] = new ShadowVtxLoadThread(i);
-                        }
-                        System.gc();
-                        System.runFinalization();
-                    }
-                }
-                br.close();
-            }
-            catch(Exception e) {
-                System.out.println("error in load_shadow_vertices: "+e.getMessage());
-            }
-
-            for(int i = 0; i < _partition_num; i++) {
-                txs[i].commit();
-                txs[i] = null;
-            }
-
-            for(int i = 0; i < _thread_num; i++) {
-                shadow_loaders[i].start();
-            }
-            for(int i = 0; i < _thread_num; i++) {
-                shadow_loaders[i].join();
-            }
-            for(int i = 0; i < _thread_num; i++) {
-                shadow_loaders[i] = null;
-            }
-            System.gc();
-            System.runFinalization();
+            br.close();
         }
+        catch(Exception e) {
+            System.out.println("error in load_shadow_vertices: "+e.getMessage());
+        }
+
+        for(int i = 0; i < _thread_num; i++) {
+            shadow_loaders[i].start();
+        }
+        for(int i = 0; i < _thread_num; i++) {
+            shadow_loaders[i].join();
+        }
+
     }
 
     static class EdgeLoadThread implements Runnable {
@@ -1501,7 +1426,7 @@ public class OptmLdbcPartitionGraphFactory {
         }
     }
 
-    public static void load_graph_shadow_vertices(String folder_name, int partition_number) {
+    public static void load_graph_shadow_vertices(String folder_name, int partition_number, int batch_id) {
         if(partition_number == 1) return;
 
         // Init graphs
@@ -1516,7 +1441,7 @@ public class OptmLdbcPartitionGraphFactory {
         load_property_types();
 
         // Load shadow vertices
-        load_shadow_vertices();
+        load_shadow_vertices(batch_id);
 
         for(int i = 0; i < _partition_num; i++) {
             _graphs.get(i).close();
