@@ -455,6 +455,7 @@ public class OptmLdbcPartitionGraphFactory {
 
             for(int i = 0; i < _partition_num; i++) {
                 tbuilder = _graphs.get(i).buildTransaction();
+                tbuilder.dirtyVertexSize(500000);
                 tbuilder.checkInternalVertexExistence(false);
                 tbuilder.checkExternalVertexExistence(false);
                 tbuilder.consistencyChecks(false);
@@ -656,6 +657,7 @@ public class OptmLdbcPartitionGraphFactory {
 
             for(int i = 0; i < _partition_num; i++) {
                 tbuilder = _graphs.get(i).buildTransaction();
+                tbuilder.dirtyVertexSize(1000000);
                 tbuilder.checkInternalVertexExistence(false);
                 tbuilder.checkExternalVertexExistence(false);
                 tbuilder.consistencyChecks(false);
@@ -789,6 +791,7 @@ public class OptmLdbcPartitionGraphFactory {
 
             for(int i = 0; i < _partition_num; i++) {
                 tbuilder = _graphs.get(i).buildTransaction();
+                tbuilder.dirtyVertexSize(1000000);
                 tbuilder.checkInternalVertexExistence(false);
                 tbuilder.checkExternalVertexExistence(false);
                 tbuilder.consistencyChecks(false);
@@ -813,7 +816,6 @@ public class OptmLdbcPartitionGraphFactory {
 
                 if(src_partition_id == dest_partition_id) {
                     e1 = src.addEdge(edge_label, dest);
-                    // counts[src_partition_id]++;
                 } else {
                     long janus_shadow_src_id_in_dest_partition = ((StandardJanusGraph) _graphs.get(dest_partition_id)).getIDManager().toVertexId(global_src);
                     long janus_shadow_dest_id_in_src_partition = ((StandardJanusGraph) _graphs.get(src_partition_id)).getIDManager().toVertexId(global_dest);
@@ -821,8 +823,6 @@ public class OptmLdbcPartitionGraphFactory {
                     Vertex shadow_src = txs[dest_partition_id].getVertex(janus_shadow_src_id_in_dest_partition);
                     e1 = src.addEdge(edge_label, shadow_dest);
                     e2 = shadow_src.addEdge(edge_label, dest);
-                    // counts[src_partition_id]++;
-                    // counts[dest_partition_id]++;
                 }
 
                 for(int i=0; i<properties.length; i++) {
@@ -899,221 +899,73 @@ public class OptmLdbcPartitionGraphFactory {
 
     static void load_edges(int batch_id) {
         System.out.println("----------------- Loading edge batch " + batch_id + " -----------------");
-        get_edge_batch_files(batch_id);
+        String file_path = "/home/houbai/codelab/documents/data/" + _folder_name + "/cut_edge_files/edge_batch_" + batch_id;
+
+        // Create thread loaders
         EdgeLoadThread[] loaders = new EdgeLoadThread[_thread_num];
+        for(int i = 0; i < _thread_num; i++) {
+            loaders[i] = new EdgeLoadThread(i);
+        }
 
-        for(String file_name : _cur_files) {
-            // Create thread loaders
-            for(int i = 0; i < _thread_num; i++) {
-                loaders[i] = new EdgeLoadThread(i);
+        try (BufferedReader br = new BufferedReader(new FileReader(file_path))) {
+            String line = br.readLine();
+            if(!line.startsWith("#flag#")) {
+                System.out.println("Error in edge cut.");
             }
-
-            // Parse labels
-            String relation_name = file_name.split("/" + _folder_name + "/")[1].split("_0_0")[0];
-            String[] names = relation_name.split("_");
-            String source_label = _name_map.get(names[0]);
-            String edge_label = names[1];
-            String dest_label = _name_map.get(names[2]);
+            String header_line = br.readLine();
+            String[] labels = line.split(" ");
+            String source_label = labels[1];
+            String edge_label = labels[2];
+            String dest_label = labels[3];
+            System.out.println("Loading "+ source_label+" "+edge_label+" "+dest_label);
             for(int i = 0; i < _thread_num; i++) {
                 loaders[i].set_labels(source_label, edge_label, dest_label);
+                loaders[i].set_header_line(header_line);
+                loaders[i].set_id_locs(0, 1);
             }
-            System.out.println("Loading "+ source_label+" "+edge_label+" "+dest_label);
 
-            // Read files
-            try (BufferedReader br = new BufferedReader(new FileReader(file_name))) {
-                // Read header line
-                String line = br.readLine();
-                String[] properties = line.split("\\|");
-                int length = properties.length;
-                int src_id_loc = length + 1;
-                int dst_id_loc = length + 1;
-                for(int i=0; i<length; i++) {
-                    if(properties[i].equals(source_label + ".id")) {
-                        src_id_loc = i;
-                        break;
+            int line_readed = 0;
+            while ((line = br.readLine()) != null) {
+                if(line.startsWith("#flag#")) {
+                    for(int i = 0; i < _thread_num; i++) {
+                        loaders[i].start();
                     }
-                }
-                for(int i=src_id_loc+1; i<length; i++) {
-                    if(properties[i].equals(dest_label + ".id")) {
-                        dst_id_loc = i;
-                        break;
+                    for(int i = 0; i < _thread_num; i++) {
+                        loaders[i].join();
                     }
-                }
-                if(src_id_loc > length || dst_id_loc > length) {
-                    System.out.println("Error in vertex proporties!");
-                    return;
-                }
-                // Set header line
-                for(int i = 0; i < _thread_num; i++) {
-                    loaders[i].set_header_line(line);
-                    loaders[i].set_id_locs(src_id_loc, dst_id_loc);
-                }
 
-                // Store lines in file
-                int line_readed = 0;
-                while ((line = br.readLine()) != null) {
+                    labels = line.split(" ");
+                    source_label = labels[1];
+                    edge_label = labels[2];
+                    dest_label = labels[3];
+                    header_line = br.readLine();
+                    System.out.println("Loading "+ source_label+" "+edge_label+" "+dest_label);
+                    for(int i = 0; i < _thread_num; i++) {
+                        loaders[i] = new EdgeLoadThread(i);
+                        loaders[i].set_labels(source_label, edge_label, dest_label);
+                        loaders[i].set_header_line(header_line);
+                        loaders[i].set_id_locs(0, 1);
+                    }
+                } else {
                     loaders[line_readed++ % _thread_num].add_line(line);
 
                     if(line_readed % 1000000 == 0)
                         System.out.println("        CSV records read number : " + line_readed);
                 }
-                br.close();
             }
-            catch(Exception e) {
-                System.out.println("error in load_edges: "+e.getMessage());
-            }
+            br.close();
+        }
+        catch(Exception e) {
+            System.out.println("error in load_edges: "+e.getMessage());
+        }
 
-            for(int i = 0; i < _thread_num; i++) {
-                loaders[i].start();
-            }
-            for(int i = 0; i < _thread_num; i++) {
-                loaders[i].join();
-            }
-            for(int i = 0; i < _thread_num; i++) {
-                loaders[i] = null;
-            }
-
-            System.gc();
-            System.runFinalization();
+        for(int i = 0; i < _thread_num; i++) {
+            loaders[i].start();
+        }
+        for(int i = 0; i < _thread_num; i++) {
+            loaders[i].join();
         }
     }
-
-    // static void load_extra_properties() {
-    //     get_extra_property_files();
-    //     int[] counts = new int[(int)_partition_num];
-    //     JanusGraphTransaction[] txs = new JanusGraphTransaction[(int)_partition_num];
-    //     TransactionBuilder tbuilder;
-    //     for(String file_name : _cur_files) {
-    //         for(int i = 0; i < _partition_num; i++) {
-    //             counts[i] = 0;
-
-    //             tbuilder = _graphs.get(i).buildTransaction();
-    //             tbuilder.vertexCacheSize(_tx_batch_size);
-    //             tbuilder.checkInternalVertexExistence(false);
-    //             tbuilder.checkExternalVertexExistence(false);
-    //             tbuilder.consistencyChecks(false);
-    //             txs[i] = tbuilder.start();
-    //         }
-
-    //         String prop_relation_name = file_name.split("/" + _folder_name + "/")[1].split("_0_0")[0];
-    //         String[] names = prop_relation_name.split("_");
-    //         String vertex_label = _name_map.get(names[0]);
-    //         String vertex_property = names[1];
-    //         String vertex_property_entity = names[2];
-    //         System.out.println("Loading extra vertex properties "+ vertex_label+" "+vertex_property+" "+vertex_property_entity);
-
-    //         try (BufferedReader br = new BufferedReader(new FileReader(file_name))) {
-    //             String line;
-    //             line = br.readLine();
-
-    //             // Initialize edge properties
-    //             String[] properties = line.split("\\|");
-    //             int length = properties.length;
-                
-    //             long last_vertex = -1;
-    //             String props = "";
-    //             while ((line = br.readLine()) != null) {
-    //                 String[] values = line.split("\\|");
-    //                 long vertex = Long.valueOf(values[1]);
-    //                 if(vertex != last_vertex) {
-    //                     if(last_vertex >= 0) {
-    //                         long dump_vertex = _label_ids_map.get(vertex_label).get(last_vertex);
-    //                         int partition_id = (int)(dump_vertex % _partition_num);
-    //                         Vertex v = txs[partition_id].getVertex(((StandardJanusGraph) _graphs.get(partition_id)).getIDManager().toVertexId(dump_vertex));
-    //                         v.property(vertex_property, props.substring(0, props.length()-1));
-    //                         props = "";
-    //                         if(counts[partition_id]++ >= _tx_batch_size) {
-    //                             txs[partition_id].commit();
-    //                             counts[partition_id] = 0;
-
-    //                             tbuilder = _graphs.get(partition_id).buildTransaction();
-    //                             tbuilder.vertexCacheSize(_tx_batch_size);
-    //                             tbuilder.checkInternalVertexExistence(false);
-    //                             tbuilder.checkExternalVertexExistence(false);
-    //                             tbuilder.consistencyChecks(false);
-    //                             txs[partition_id] = tbuilder.start();
-    //                         }
-    //                     }
-    //                     last_vertex = vertex;
-    //                 }
-    //                 props += (values[2] + " ");
-    //             }
-    //             br.close();
-    //         }
-    //         catch(Exception e) {
-    //             System.out.println("error in load_extra_properties: "+e.getMessage());
-    //         }
-    //         for(int i = 0; i < _partition_num; i++) {
-    //             if(counts[i] != 0) {
-    //                 txs[i].commit();
-    //             }
-    //         }
-    //     }
-    // }
-
-    // static void dump_label_map() {
-    //     String[] all_labels = { 
-    //         "Comment",
-    //         "Forum",
-    //         "Organisation",
-    //         "Person",
-    //         "Place",
-    //         "Post",
-    //         "Tag",
-    //         "TagClass",
-    //     };
-
-    //     for(int i = 0; i < 8; i++) {
-    //         String dump_file_path = "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/db/bdbje-partitions/" + _folder_name + "/label_map/" + all_labels[i];
-
-    //         try (BufferedWriter bw = new BufferedWriter(new FileWriter(dump_file_path))) {
-    //             Iterator<HashMap.Entry<Long, Long>> entries = _label_ids_map.get(all_labels[i]).entrySet().iterator();
-    //             while (entries.hasNext()) {
-    //                 HashMap.Entry<Long, Long> entry = entries.next();
-    //                 bw.write(entry.getKey() + " " + entry.getValue());
-    //                 if(entries.hasNext()) {
-    //                     bw.newLine();
-    //                 }
-    //             }
-    //             bw.flush();
-    //             bw.close();
-    //         }
-    //         catch(Exception e) {
-    //             System.out.println("error in dump_label_map: "+e.getMessage());
-    //         }
-    //     }
-    // }
-
-    // static void load_label_map() {
-    //     String[] all_labels = { 
-    //         "Comment",
-    //         "Forum",
-    //         "Organisation",
-    //         "Person",
-    //         "Place",
-    //         "Post",
-    //         "Tag",
-    //         "TagClass",
-    //     };
-
-    //     for(int i = 0; i < 8; i++) {
-    //         String load_file_path = "/home/houbai/codelab/janusgraph-0.5.0-SNAPSHOT-hadoop2/db/bdbje-partitions/" + _folder_name + "/label_map/" + all_labels[i];
-            
-    //         HashMap<Long, Long> id_map = _label_ids_map.get(all_labels[i]);
-    //         id_map.clear();
-    //         try (BufferedReader br = new BufferedReader(new FileReader(load_file_path))) {
-    //             String line;
-    //             while((line = br.readLine()) != null) {
-    //                 String[] values = line.split(" ");
-    //                 id_map.put(Long.valueOf(values[0]), Long.valueOf(values[1]));
-    //             }
-    //             br.close();
-    //         }
-    //         catch(Exception e) {
-    //             System.out.println("error in load_label_map: "+e.getMessage());
-    //         }
-    //     }
-    // }
 
     static void make_label_schema() {
         ArrayList<String> _vertex_labels = new ArrayList<String>();
@@ -1205,196 +1057,6 @@ public class OptmLdbcPartitionGraphFactory {
     private static boolean mixedIndexNullOrExists(StandardJanusGraph graph, String indexName) {
         return indexName == null || graph.getIndexSerializer().containsIndex(indexName);
     }
-
-    // public static void dedupe_vertex_schema_files(int p_id) {
-
-    //     String[] in_files = { 
-    //         Integer.toString(p_id) + "_typeIDToPropertyName.csv",
-    //         Integer.toString(p_id) + "_typeIDToPropertyNameRemaining.csv",
-    //         Integer.toString(p_id) + "_typeIDToVertexLabel.csv",
-    //         Integer.toString(p_id) + "_typeIDToEdgeLabel.csv",
-    //     };
-    //     String[] out_files = {
-    //         "db/bdbje-partitions/v_typeIDToPropertyName.csv",
-    //         "db/bdbje-partitions/v_typeIDToPropertyNameRemaining.csv",
-    //         "db/bdbje-partitions/v_typeIDToVertexLabel.csv",
-    //         "db/bdbje-partitions/v_typeIDToEdgeLabel.csv",
-    //     };
-    //     HashMap<String, Integer> properties_to_id = new HashMap<>();
-    //     HashMap<String, Integer> properties_to_type = new HashMap<>();
-    //     HashMap<String, Integer> labels = new HashMap<>();
-    //     // HashSet<String> contents = new HashSet<>();
-
-
-    //     for(int i=0; i<1; i++) {
-    //         properties_to_id.clear();
-    //         properties_to_type.clear();
-            
-    //         try (BufferedReader br = new BufferedReader(new FileReader(in_files[i]))) {
-    //             String line = br.readLine();
-    //             while(line != null) {
-    //                 String[] values = line.split(",");
-    //                 if(propertyTypes.containsKey(values[1])) {
-    //                     properties_to_id.put(values[1], Integer.valueOf(values[0]));
-    //                     properties_to_type.put(values[1], Integer.valueOf(values[2]));
-    //                 }
-    //                 line = br.readLine();
-    //             }
-    //             br.close();
-    //         }
-    //         catch(Exception e) {
-    //             System.out.println("error in dedupe_schema_files(PropertyName Read): "+e.getMessage());
-    //         }
-
-    //         try (BufferedWriter bw = new BufferedWriter(new FileWriter(out_files[i]))) {
-    //             Iterator<HashMap.Entry<String, Integer>> entries = properties_to_id.entrySet().iterator();
-    //             while (entries.hasNext()) {
-    //                 HashMap.Entry<String, Integer> entry = entries.next();
-    //                 bw.write(entry.getValue() + "," + entry.getKey() + "," + properties_to_type.get(entry.getKey()));
-    //                 if(entries.hasNext()) {
-    //                     bw.newLine();
-    //                 }
-    //             }
-    //             bw.flush();
-    //             bw.close();
-    //         }
-    //         catch(Exception e) {
-    //             System.out.println("error in dedupe_schema_files(PropertyName Write): "+e.getMessage());
-    //         }
-    //     }
-
-    //     for(int i=1; i<2; i++) {
-    //         labels.clear();
-
-    //         try (BufferedReader br = new BufferedReader(new FileReader(in_files[i]))) {
-    //             String line = br.readLine();
-    //             while(line != null) {
-    //                 String[] values = line.split(",");
-    //                 if(vertexLabels.contains(values[1]) || edgeLabels.contains(values[1])) {
-    //                     labels.put(values[1], Integer.valueOf(values[0]));
-    //                     // System.out.println("label: "+values[1]+", id: "+values[0]);
-    //                 }
-    //                 if(i == 2 && labels.size() == vertexLabels.size()) break;
-    //                 line = br.readLine();
-    //             }
-    //             br.close();
-    //         }
-    //         catch(Exception e) {
-    //             System.out.println("error in dedupe_schema_files(Vertex/Edge label read): "+e.getMessage());
-    //         }
-
-    //         try (BufferedWriter bw = new BufferedWriter(new FileWriter(out_files[i]))) {
-    //             Iterator<HashMap.Entry<String, Integer>> entries = labels.entrySet().iterator();
-    //             while (entries.hasNext()) {
-    //                 HashMap.Entry<String, Integer> entry = entries.next();
-    //                 bw.write(entry.getValue() + "," + entry.getKey());
-    //                 if(entries.hasNext()) {
-    //                     bw.newLine();
-    //                 }
-    //             }
-    //             bw.flush();
-    //             bw.close();
-    //         }
-    //         catch(Exception e) {
-    //             System.out.println("error in dedupe_schema_files(Vertex/Edge label write): "+e.getMessage());
-    //         }
-    //     }
-    // }
-
-    // public static void dedupe_edge_schema_files(int p_id, int batch_id) {
-
-    //     String[] in_files = {
-    //         Integer.toString(p_id) + "_typeIDToPropertyName.csv",
-    //         Integer.toString(p_id) + "_typeIDToPropertyNameRemaining.csv",
-    //         Integer.toString(p_id) + "_typeIDToVertexLabel.csv",
-    //         Integer.toString(p_id) + "_typeIDToEdgeLabel.csv",
-    //     };
-    //     String[] out_files = {
-    //         "db/bdbje-partitions/e_" + batch_id + "_typeIDToPropertyName.csv",
-    //         "db/bdbje-partitions/e_" + batch_id + "_typeIDToPropertyNameRemaining.csv",
-    //         "db/bdbje-partitions/e_" + batch_id + "_typeIDToVertexLabel.csv",
-    //         "db/bdbje-partitions/e_" + batch_id + "_typeIDToEdgeLabel.csv",
-    //     };
-    //     HashMap<String, Integer> properties_to_id = new HashMap<>();
-    //     HashMap<String, Integer> properties_to_type = new HashMap<>();
-    //     HashMap<String, Integer> labels = new HashMap<>();
-    //     // HashSet<String> contents = new HashSet<>();
-
-
-    //     for(int i=0; i<1; i++) {
-    //         properties_to_id.clear();
-    //         properties_to_type.clear();
-            
-    //         try (BufferedReader br = new BufferedReader(new FileReader(in_files[i]))) {
-    //             String line = br.readLine();
-    //             while(line != null) {
-    //                 String[] values = line.split(",");
-    //                 if(propertyTypes.containsKey(values[1])) {
-    //                     properties_to_id.put(values[1], Integer.valueOf(values[0]));
-    //                     properties_to_type.put(values[1], Integer.valueOf(values[2]));
-    //                 }
-    //                 line = br.readLine();
-    //             }
-    //             br.close();
-    //         }
-    //         catch(Exception e) {
-    //             System.out.println("error in dedupe_schema_files(PropertyName Read): "+e.getMessage());
-    //         }
-
-    //         try (BufferedWriter bw = new BufferedWriter(new FileWriter(out_files[i]))) {
-    //             Iterator<HashMap.Entry<String, Integer>> entries = properties_to_id.entrySet().iterator();
-    //             while (entries.hasNext()) {
-    //                 HashMap.Entry<String, Integer> entry = entries.next();
-    //                 bw.write(entry.getValue() + "," + entry.getKey() + "," + properties_to_type.get(entry.getKey()));
-    //                 if(entries.hasNext()) {
-    //                     bw.newLine();
-    //                 }
-    //             }
-    //             bw.flush();
-    //             bw.close();
-    //         }
-    //         catch(Exception e) {
-    //             System.out.println("error in dedupe_schema_files(PropertyName Write): "+e.getMessage());
-    //         }
-    //     }
-
-    //     for(int i=1; i<2; i++) {
-    //         labels.clear();
-
-    //         try (BufferedReader br = new BufferedReader(new FileReader(in_files[i]))) {
-    //             String line = br.readLine();
-    //             while(line != null) {
-    //                 String[] values = line.split(",");
-    //                 if(vertexLabels.contains(values[1]) || edgeLabels.contains(values[1])) {
-    //                     labels.put(values[1], Integer.valueOf(values[0]));
-    //                     // System.out.println("label: "+values[1]+", id: "+values[0]);
-    //                 }
-    //                 if(i == 2 && labels.size() == vertexLabels.size()) break;
-    //                 line = br.readLine();
-    //             }
-    //             br.close();
-    //         }
-    //         catch(Exception e) {
-    //             System.out.println("error in dedupe_schema_files(Vertex/Edge label read): "+e.getMessage());
-    //         }
-
-    //         try (BufferedWriter bw = new BufferedWriter(new FileWriter(out_files[i]))) {
-    //             Iterator<HashMap.Entry<String, Integer>> entries = labels.entrySet().iterator();
-    //             while (entries.hasNext()) {
-    //                 HashMap.Entry<String, Integer> entry = entries.next();
-    //                 bw.write(entry.getValue() + "," + entry.getKey());
-    //                 if(entries.hasNext()) {
-    //                     bw.newLine();
-    //                 }
-    //             }
-    //             bw.flush();
-    //             bw.close();
-    //         }
-    //         catch(Exception e) {
-    //             System.out.println("error in dedupe_schema_files(Vertex/Edge label write): "+e.getMessage());
-    //         }
-    //     }
-    // }
 
     public static void load(final JanusGraph graph) {
     }
